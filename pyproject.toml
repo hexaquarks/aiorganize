@@ -6,3 +6,8 @@ dependencies = [
     "langchain>=1,<2",
     "langchain-openai>=1,<2",
 ]
+
+[dependency-groups]
+dev = [
+    "playwright>=1.63.0",
+]

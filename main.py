@@ -1,8 +1,16 @@
 import os
 
 from langchain.messages import AIMessage
+from langchain_core.messages import BaseMessage
 
 from agent import build_agent
+
+
+def print_message(message: BaseMessage) -> None:
+    if isinstance(message, AIMessage) and not message.tool_calls:
+        print(f"\nFinal answer:\n{message.text}", flush=True)
+    else:
+        message.pretty_print()
 
 
 def main() -> None:
@@ -22,10 +30,7 @@ def main() -> None:
     ):
         for step in update.values():
             for message in step["messages"]:
-                if isinstance(message, AIMessage) and not message.tool_calls:
-                    print(f"\nFinal answer:\n{message.text}")
-                else:
-                    message.pretty_print()
+                print_message(message)
 
 
 if __name__ == "__main__":
