@@ -1,3 +1,7 @@
+[build-system]
+requires = ["hatchling>=1.26"]
+build-backend = "hatchling.build"
+
 [project]
 name = "aiorganize"
 version = "0.1.0"
@@ -5,9 +9,6 @@ requires-python = ">=3.11"
 dependencies = [
     "langchain>=1,<2",
     "langchain-openai>=1,<2",
-]
-
-[dependency-groups]
-dev = [
     "playwright>=1.63.0",
+    "pydantic>=2,<3",
 ]

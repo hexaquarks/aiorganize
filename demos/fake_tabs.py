@@ -1,32 +1,17 @@
-import json
 import os
 
-from langchain.messages import AIMessage, ToolMessage
-from langchain_core.messages import BaseMessage
-
-from agent import build_agent
-
-
-def print_message(message: BaseMessage) -> None:
-    if isinstance(message, AIMessage):
-        if message.tool_calls:
-            for call in message.tool_calls:
-                print(f"\nTool request: {call['name']}({json.dumps(call['args'])})", flush=True)
-        else:
-            print(f"\nFinal answer (proposal only):\n{message.text}", flush=True)
-    elif isinstance(message, ToolMessage):
-        print(f"\nTool result ({message.name}):\n{message.content}", flush=True)
-    else:
-        message.pretty_print()
+from aiorganize.agent import build_agent
+from aiorganize.terminal import print_message
+from demos.fake_tools import list_tabs, read_tab
 
 
 def main() -> None:
     if not os.environ.get("OPENAI_API_KEY"):
         raise SystemExit(
-            "Set OPENAI_API_KEY or run: uv run --env-file .env python main.py"
+            "Set OPENAI_API_KEY or run: make run"
         )
 
-    agent = build_agent()
+    agent = build_agent(list_tabs, read_tab)
     prompt = "Inspect ambiguous tabs and propose topic groups for all the tabs."
     print(f"Prompt: {prompt}", flush=True)
 

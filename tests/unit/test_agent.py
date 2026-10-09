@@ -6,7 +6,8 @@ from langchain.messages import AIMessage
 from langchain.tools import tool
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 
-from agent import build_agent
+from aiorganize.agent import build_agent
+from demos.fake_tools import read_tab
 
 
 class RepeatingToolModel(FakeMessagesListChatModel):
@@ -35,8 +36,8 @@ class AgentLimitTest(unittest.TestCase):
                 for index in range(11)
             ]
         )
-        with patch("agent.ChatOpenAI", return_value=model):
-            agent = build_agent(counted_tool)
+        with patch("aiorganize.agent.ChatOpenAI", return_value=model):
+            agent = build_agent(counted_tool, read_tab)
             with self.assertRaises(ToolCallLimitExceededError):
                 agent.invoke(
                     {"messages": [{"role": "user", "content": "List tabs"}]},
