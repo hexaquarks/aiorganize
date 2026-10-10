@@ -2,6 +2,9 @@
   "manifest_version": 3,
   "name": "AI Organize Groups",
   "version": "0.1.0",
-  "permissions": ["tabs", "tabGroups", "debugger"],
+  "minimum_chrome_version": "123",
+  "permissions": ["tabs", "tabGroups", "debugger", "sidePanel"],
+  "action": {"default_title": "Organize tabs"},
+  "side_panel": {"default_path": "panel.html"},
   "background": {"service_worker": "background.js"}
 }
