@@ -4,7 +4,7 @@ import os
 from tempfile import TemporaryDirectory
 
 from langchain.messages import AIMessage, ToolMessage
-from playwright.async_api import BrowserContext, async_playwright
+from playwright.async_api import BrowserContext, Page, Worker, async_playwright
 
 from aiorganize.agent import build_agent
 from aiorganize.chrome_groups import GROUP_BROWSER_ARGS, apply_groups, load_group_extension
@@ -14,8 +14,15 @@ from aiorganize.tools import chrome_read_tab_tool, chrome_tab_tool
 from demos.fixtures import EXTENSION_PATH, create_test_tabs
 
 
-async def propose_groups(context: BrowserContext, request: str) -> GroupingProposal:
-    agent = build_agent(chrome_tab_tool(context), chrome_read_tab_tool(context), structured=True)
+async def propose_groups(
+    context: BrowserContext, request: str, *, worker: Worker | Page | None = None,
+    window_id: int | None = None,
+) -> GroupingProposal:
+    agent = build_agent(
+        chrome_tab_tool(context, worker=worker, window_id=window_id),
+        chrome_read_tab_tool(context, worker=worker, window_id=window_id),
+        structured=True,
+    )
     proposal = None
     async for update in agent.astream(
         {"messages": [{"role": "user", "content": request}]},
@@ -38,9 +45,59 @@ async def propose_groups(context: BrowserContext, request: str) -> GroupingPropo
     return proposal
 
 
+async def review_and_apply(
+    context: BrowserContext, worker: Worker | Page, *, window_id: int | None = None
+) -> None:
+    request = "Inspect ambiguous tabs and propose topic groups for all the tabs."
+    while True:
+        selected_worker = worker if window_id is not None else None
+        snapshot = await chrome_tab_tool(
+            context, worker=selected_worker, window_id=window_id
+        ).ainvoke({})
+        if not snapshot:
+            print("The selected Chrome window has no accessible tabs.")
+            return
+        if len(snapshot) == 1 and snapshot[0]["url"] in {"about:blank", "chrome://newtab/"}:
+            await asyncio.to_thread(
+                input,
+                "Open the tabs to organize in Chrome, then press Enter: ",
+            )
+            continue
+        print(f"Found {len(snapshot)} tabs. Asking the model for groups...", flush=True)
+        proposal = await propose_groups(
+            context, request, worker=selected_worker, window_id=window_id
+        )
+        proposal.validate_tabs(snapshot)
+        print_preview(proposal, snapshot)
+        while True:
+            decision = await asyncio.to_thread(input, "\nType approve, reject, or changes: ")
+            decision = decision.strip().casefold()
+            if decision in {"approve", "reject", "changes"}:
+                break
+
+        if decision == "reject":
+            print("Rejected. No groups were applied.")
+            return
+        if decision == "changes":
+            feedback = await asyncio.to_thread(input, "What should change? ")
+            request = (
+                "Inspect ambiguous tabs and propose topic groups for all the tabs. "
+                f"Previous proposal: {proposal.model_dump_json()}. "
+                f"Requested changes: {feedback}"
+            )
+            continue
+
+        state = await apply_groups(worker, proposal, snapshot, approved=True, window_id=window_id)
+        print("\nApplied and verified browser groups:")
+        for group in state["groups"]:
+            if window_id is None or group["window_id"] == window_id:
+                print(f"  {group['name']} ({group['color']})")
+        return
+
+
 async def run_demo(*, headless: bool) -> None:
     if not os.environ.get("OPENAI_API_KEY"):
-        raise SystemExit("Run with: make apply-chrome")
+        raise SystemExit("Set OPENAI_API_KEY before running the isolated Chrome demo.")
 
     async with async_playwright() as playwright:
         with TemporaryDirectory(prefix="aiorganize-apply-") as profile:
@@ -55,36 +112,8 @@ async def run_demo(*, headless: bool) -> None:
                 worker = await load_group_extension(context, EXTENSION_PATH)
                 await create_test_tabs(context)
                 await context.new_page()
-                request = "Inspect ambiguous tabs and propose topic groups for all the tabs."
-                while True:
-                    snapshot = await chrome_tab_tool(context).ainvoke({})
-                    proposal = await propose_groups(context, request)
-                    proposal.validate_tabs(snapshot)
-                    print_preview(proposal, snapshot)
-                    while True:
-                        decision = await asyncio.to_thread(input, "\nType approve, reject, or changes: ")
-                        decision = decision.strip().casefold()
-                        if decision in {"approve", "reject", "changes"}:
-                            break
-
-                    if decision == "reject":
-                        print("Rejected. No groups were applied.")
-                        break
-                    if decision == "changes":
-                        feedback = await asyncio.to_thread(input, "What should change? ")
-                        request = (
-                            "Inspect ambiguous tabs and propose topic groups for all the tabs. "
-                            f"Previous proposal: {proposal.model_dump_json()}. "
-                            f"Requested changes: {feedback}"
-                        )
-                        continue
-
-                    state = await apply_groups(worker, proposal, snapshot, approved=True)
-                    print("\nApplied and verified browser groups:")
-                    for group in state["groups"]:
-                        print(f"  {group['name']} ({group['color']})")
-                    await asyncio.to_thread(input, "\nInspect Chrome, then press Enter to end the test: ")
-                    break
+                await review_and_apply(context, worker)
+                await asyncio.to_thread(input, "\nInspect Chrome, then press Enter to end the test: ")
             except EOFError:
                 print("\nInput ended. Closing the isolated test browser.")
             finally:

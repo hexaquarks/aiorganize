@@ -2,12 +2,16 @@ from pydantic import BaseModel, Field
 
 
 class TabGroup(BaseModel):
-    name: str = Field(min_length=1, max_length=60)
+    name: str = Field(min_length=1, max_length=7)
     tab_ids: list[str] = Field(min_length=1)
 
 
 class GroupingProposal(BaseModel):
     groups: list[TabGroup] = Field(min_length=1)
+
+    def ordered_groups(self) -> list[TabGroup]:
+        """Keep the catchall group after specific topics in previews and browser updates."""
+        return sorted(self.groups, key=lambda group: group.name.strip().casefold() == "other")
 
     def validate_tabs(self, tabs: list[dict[str, str]]) -> None:
         """Require one assignment per input tab before offering to apply anything."""
@@ -25,7 +29,7 @@ class GroupingProposal(BaseModel):
 def print_preview(proposal: GroupingProposal, tabs: list[dict[str, str]]) -> None:
     by_id = {tab["id"]: tab for tab in tabs}
     print("\nProposed browser groups:", flush=True)
-    for group in proposal.groups:
+    for group in proposal.ordered_groups():
         print(f"\n{group.name}")
         for tab_id in group.tab_ids:
             tab = by_id[tab_id]
