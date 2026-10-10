@@ -1,11 +1,13 @@
-// Python calls these functions through the isolated browser's debugging connection.
-// There is no page message listener, so website content cannot request mutations.
-chrome.runtime.onInstalled.addListener(() => {});
+// Python and extension pages call these helpers directly.
+// There is no website message listener, so website content cannot request mutations.
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.sidePanel.setPanelBehavior({openPanelOnActionClick: true}).catch(console.error);
+});
 
 async function tabGroupState() {
   const targets = await chrome.debugger.getTargets();
   const tabs = (await chrome.tabs.query({})).filter(tab =>
-    tab.url !== chrome.runtime.getURL("control.html")
+    !tab.url?.startsWith(chrome.runtime.getURL(""))
   );
   const targetByTab = new Map(
     targets.filter(target => target.tabId !== undefined).map(target => [target.tabId, target.id])

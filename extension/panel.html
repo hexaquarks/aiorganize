@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AI Organize</title>
+    <link rel="stylesheet" href="panel.css">
+    <script src="background.js" defer></script>
+    <script type="module" src="panel-entry.js"></script>
+  </head>
+  <body>
+    <main>
+      <header>
+        <p class="eyebrow">AI ORGANIZE</p>
+        <h1>A little order for your tabs.</h1>
+        <p>Organize this window into topic groups. Review every tab before applying changes.</p>
+      </header>
+      <button id="organize" type="button">Organize tabs</button>
+      <p id="status" role="status" aria-live="polite">Ready when you are.</p>
+      <section id="preview" aria-labelledby="preview-heading" hidden>
+        <h2 id="preview-heading">Preview groups</h2>
+        <p id="summary"></p>
+        <div id="groups"></div>
+        <div class="actions">
+          <button id="approve" type="button">Approve &amp; apply</button>
+          <button id="reject" class="secondary" type="button">Reject</button>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>
