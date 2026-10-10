@@ -7,7 +7,7 @@ from aiorganize.chrome_groups import GROUP_BROWSER_ARGS, load_group_extension
 from demos.fixtures import EXTENSION_PATH, create_test_tabs
 
 
-class ExtensionPanelTest(unittest.IsolatedAsyncioTestCase):
+class PanelTestCase(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         self.profile = tempfile.TemporaryDirectory(prefix="aiorganize-panel-test-")
         self.addCleanup(self.profile.cleanup)
@@ -56,12 +56,21 @@ class ExtensionPanelTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(state["groups"], [])
         self.assertTrue(all(tab["group_id"] == -1 for tab in state["tabs"]))
 
+
+class ExtensionPanelTest(PanelTestCase):
     async def test_disconnected_agent_reports_error_without_mutations(self):
         self.assertTrue(await self.worker.evaluate(
             "async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick"
         ))
+        await self.panel.evaluate("""async () => {
+            const {panel} = await import('./panel-entry.js');
+            const {mountPanel} = await import('./panel.js');
+            const {requestProposal} = await import('./proposal-client.js');
+            panel.destroy();
+            mountPanel(document, request => requestProposal(request, {hostName: 'com.aiorganize.not_installed'}));
+        }""")
         await self.panel.get_by_role("button", name="Organize tabs", exact=True).click()
-        await expect(self.panel.get_by_role("status")).to_contain_text("AI grouping isn’t connected yet")
+        await expect(self.panel.get_by_role("status")).to_contain_text("Python companion unavailable")
         await expect(self.panel.locator("#preview")).to_be_hidden()
         await expect(self.panel.locator("#approve")).to_be_disabled()
         await self.assert_no_groups()

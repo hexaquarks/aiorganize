@@ -1,6 +1,9 @@
-.PHONY: run test
+.PHONY: run apply-chrome test
 
 run:
+	uv run --env-file .env python -m demos.extension_chrome
+
+apply-chrome:
 	uv run --env-file .env python -m demos.apply_live_chrome
 
 test:

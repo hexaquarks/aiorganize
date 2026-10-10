@@ -11,19 +11,26 @@
   <body>
     <main>
       <header>
-        <p class="eyebrow">AI ORGANIZE</p>
-        <h1>A little order for your tabs.</h1>
-        <p>Organize this window into topic groups. Review every tab before applying changes.</p>
+        <div class="brand"><span class="brand-mark" aria-hidden="true">✦</span><span>AI Organize</span></div>
+        <h1>Less clutter.<br>More focus.</h1>
+        <p class="intro">A place for every tab.</p>
       </header>
-      <button id="organize" type="button">Organize tabs</button>
-      <p id="status" role="status" aria-live="polite">Ready when you are.</p>
+      <button id="organize" type="button">
+        <span aria-hidden="true">✦</span><span id="organize-label">Organize tabs</span>
+      </button>
+      <div class="status-line">
+        <span id="activity" aria-hidden="true"></span>
+        <p id="status" role="status" aria-live="polite">Ready when you are.</p>
+      </div>
       <section id="preview" aria-labelledby="preview-heading" hidden>
-        <h2 id="preview-heading">Preview groups</h2>
+        <div class="section-heading">
+          <h2 id="preview-heading">Your new workspace</h2><span class="preview-badge">Preview</span>
+        </div>
         <p id="summary"></p>
         <div id="groups"></div>
         <div class="actions">
-          <button id="approve" type="button">Approve &amp; apply</button>
           <button id="reject" class="secondary" type="button">Reject</button>
+          <button id="approve" type="button">Approve &amp; apply <span aria-hidden="true">→</span></button>
         </div>
       </section>
     </main>
