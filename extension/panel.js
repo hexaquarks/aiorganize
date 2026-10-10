@@ -124,9 +124,14 @@ export function mountPanel(root, propose = requestProposal) {
         throw new Error("This window has no tabs to organize.");
       }
       status.textContent = `Preparing groups for ${snapshot.length} tabs…`;
-      const proposal = await propose({snapshot, window_id: window.id, onProgress: message => {
-        if (!listeners.signal.aborted) status.textContent = message;
-      }});
+      const proposal = await propose({
+        snapshot,
+        window_id: window.id,
+        signal: listeners.signal,
+        onProgress: message => {
+          if (!listeners.signal.aborted) status.textContent = message;
+        },
+      });
       if (listeners.signal.aborted) return;
       const groups = validateProposal(proposal, snapshot);
       pending = {groups, snapshot, window_id: window.id};
@@ -135,7 +140,7 @@ export function mountPanel(root, propose = requestProposal) {
       preview.hidden = false;
       status.textContent = "Review the groups below. Your tabs haven’t changed.";
     } catch (error) {
-      status.textContent = error.message;
+      if (!listeners.signal.aborted) status.textContent = error.message;
     } finally {
       if (!listeners.signal.aborted) setBusy(false);
     }

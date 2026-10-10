@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from pydantic import ValidationError
@@ -95,6 +96,44 @@ class CompanionTest(unittest.TestCase):
         self.assertIn("error", read_tool.invoke({"tab_id": "tab-2"}))
         self.assertEqual(calls, [])
         self.assertEqual(len(read_tool.invoke({"tab_id": "tab-1"})["content"]), 4000)
+
+    def test_page_reads_are_bounded_and_repeated_tool_reads_are_cached(self):
+        tabs = [{
+            "id": f"tab-{index}", "chrome_id": index, "window_id": 1,
+            "title": "ChatGPT" if index < 34 else "Python tutorial", "url": "https://test/",
+        } for index in range(1, 35)]
+        source = request_frame(snapshot=tabs)
+        source.seek(0, io.SEEK_END)
+        for request_id, batch in enumerate((tabs[:32], tabs[32:33], tabs[33:]), start=1):
+            write_message(source, {
+                "type": "tabs_content", "request_id": request_id,
+                "results": [{"id": tab["id"], "content": "Page text"} for tab in batch],
+            })
+        source.seek(0)
+        output = io.BytesIO()
+
+        def build_test_agent(tab_tool, read_tool, **kwargs):
+            def invoke(*args, **kwargs):
+                first = read_tool.invoke({"tab_id": "tab-34"})
+                self.assertEqual(first, read_tool.invoke({"tab_id": "tab-34"}))
+                return {"structured_response": {"groups": [{
+                    "name": "Dev", "tab_ids": [tab["id"] for tab in tabs],
+                }]}}
+
+            return SimpleNamespace(invoke=invoke)
+
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-only"}), patch(
+            "aiorganize.companion.build_agent", side_effect=build_test_agent,
+        ):
+            serve(source, output)
+
+        output.seek(0)
+        messages = []
+        while output.tell() < len(output.getvalue()):
+            messages.append(read_message(output))
+        batches = [message["tab_ids"] for message in messages if message["type"] == "read_tabs"]
+        self.assertEqual([len(batch) for batch in batches], [32, 1, 1])
+        self.assertEqual(messages[-1]["type"], "proposal")
 
     def test_registration_restricts_extension_and_keeps_key_out_of_files(self):
         with tempfile.TemporaryDirectory(prefix="companion spaces ") as temp:

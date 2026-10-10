@@ -16,7 +16,7 @@ def ambiguous_tab_ids(tabs: list[dict[str, str]]) -> list[str]:
 
 def extension_tools(tabs: list[dict[str, str]], read_page: Callable[[str], dict]) -> tuple[BaseTool, BaseTool]:
     """Expose only the panel's snapshot and read requests for tabs in that snapshot."""
-    by_id = {tab["id"]: tab for tab in tabs}
+    tab_ids = {tab["id"] for tab in tabs}
 
     @tool("list_tabs")
     def list_extension_tabs() -> list[dict[str, str]]:
@@ -26,7 +26,7 @@ def extension_tools(tabs: list[dict[str, str]], read_page: Callable[[str], dict]
     @tool("read_tab")
     def read_extension_tab(tab_id: str) -> dict:
         """Read up to 4,000 characters of visible page text for an existing tab ID."""
-        if tab_id not in by_id:
+        if tab_id not in tab_ids:
             return {"id": tab_id, "error": "Tab not found."}
         result = read_page(tab_id)
         return {

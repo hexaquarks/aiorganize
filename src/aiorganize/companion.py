@@ -84,42 +84,41 @@ def serve(input_stream: BinaryIO, output_stream: BinaryIO) -> None:
             return
 
         tabs = [tab.model_dump(include={"id", "title", "url"}) for tab in request.snapshot]
-        cached_pages = {}
-        ambiguous_ids = ambiguous_tab_ids(tabs)
-        if ambiguous_ids:
-            write_message(output_stream, {"type": "read_tabs", "tab_ids": ambiguous_ids, "request_id": 0})
-            reply = read_message(input_stream)
-            results = reply.get("results")
-            if (
-                reply.get("type") != "tabs_content" or reply.get("request_id") != 0
-                or not isinstance(results, list)
-                or len(results) != len(ambiguous_ids)
-                or any(not isinstance(result, dict) for result in results)
-                or {result.get("id") for result in results} != set(ambiguous_ids)
-            ):
-                raise ValueError("Invalid batch page-reading response.")
-            cached_pages = {result["id"]: result for result in results}
-
+        cached_pages: dict[str, dict] = {}
         read_lock = threading.Lock()
         next_read_id = 0
 
-        def read_page(tab_id: str) -> dict:
+        def read_pages(tab_ids: list[str]) -> None:
             nonlocal next_read_id
-            if tab_id in cached_pages:
-                return cached_pages[tab_id]
-            # LangChain may run tools concurrently; each reply must match its own read request.
-            with read_lock:
+            # Bound each reply below the framing limit, even with non-ASCII page text.
+            for start in range(0, len(tab_ids), 32):
+                batch = tab_ids[start:start + 32]
                 next_read_id += 1
-                write_message(output_stream, {"type": "read_tab", "tab_id": tab_id, "request_id": next_read_id})
+                write_message(output_stream, {
+                    "type": "read_tabs", "tab_ids": batch, "request_id": next_read_id,
+                })
                 reply = read_message(input_stream)
+                results = reply.get("results")
                 if (
-                    reply.get("type") != "tab_content"
+                    reply.get("type") != "tabs_content"
                     or reply.get("request_id") != next_read_id
-                    or not isinstance(reply.get("result"), dict)
-                    or reply["result"].get("id") != tab_id
+                    or not isinstance(results, list)
+                    or len(results) != len(batch)
+                    or any(not isinstance(result, dict) for result in results)
+                    or {result.get("id") for result in results} != set(batch)
                 ):
                     raise ValueError("Invalid page-reading response.")
-                return reply["result"]
+                cached_pages.update((result["id"], result) for result in results)
+
+        def read_page(tab_id: str) -> dict:
+            # LangChain can call tools concurrently; serialize requests and cache repeated reads.
+            with read_lock:
+                if tab_id not in cached_pages:
+                    read_pages([tab_id])
+                return cached_pages[tab_id]
+
+        ambiguous_ids = ambiguous_tab_ids(tabs)
+        read_pages(ambiguous_ids)
 
         tab_tool, read_tool = extension_tools(tabs, read_page)
         context = {

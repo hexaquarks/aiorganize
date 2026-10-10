@@ -1,7 +1,6 @@
 import json
 import shlex
 import sys
-import unittest
 import uuid
 from pathlib import Path
 
@@ -12,11 +11,7 @@ from demos.extension_chrome import prepare_extension
 from tests.integration import test_panel
 
 
-class NativeCompanionTest(unittest.IsolatedAsyncioTestCase):
-    asyncSetUp = test_panel.ExtensionPanelTest.asyncSetUp
-    organize = test_panel.ExtensionPanelTest.organize
-    assert_no_groups = test_panel.ExtensionPanelTest.assert_no_groups
-
+class NativeCompanionTest(test_panel.PanelTestCase):
     async def install_native_fixture(self, *, failure=False):
         host_name = "com.aiorganize.test_" + uuid.uuid4().hex
         origin = self.worker.url.removesuffix("background.js")
@@ -94,3 +89,27 @@ class NativeCompanionTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response["type"], "error")
         state = await self.panel.evaluate("() => tabGroupState(true)")
         self.assertEqual(state["groups"], [])
+
+    async def test_cancelling_a_request_disconnects_its_native_port(self):
+        result = await self.panel.evaluate("""async () => {
+            const {requestProposal} = await import('./proposal-client.js');
+            const original = chrome.runtime.connectNative;
+            let disconnected = 0;
+            chrome.runtime.connectNative = () => ({
+                onMessage: {addListener() {}},
+                onDisconnect: {addListener() {}},
+                postMessage() {},
+                disconnect() { disconnected += 1; },
+            });
+            try {
+                const controller = new AbortController();
+                const request = requestProposal({snapshot: [], window_id: 1, signal: controller.signal});
+                controller.abort();
+                const error = await request.catch(error => error.name);
+                return {error, disconnected};
+            } finally {
+                chrome.runtime.connectNative = original;
+            }
+        }""")
+        self.assertEqual(result, {"error": "AbortError", "disconnected": 1})
+        await self.assert_no_groups()
