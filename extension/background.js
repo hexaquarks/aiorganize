@@ -4,8 +4,8 @@ chrome.runtime.onInstalled.addListener(() => {
   chrome.sidePanel.setPanelBehavior({openPanelOnActionClick: true}).catch(console.error);
 });
 
-async function tabGroupState() {
-  const targets = await chrome.debugger.getTargets();
+async function tabGroupState(nativeIds = false) {
+  const targets = nativeIds ? [] : await chrome.debugger.getTargets();
   const tabs = (await chrome.tabs.query({})).filter(tab =>
     !tab.url?.startsWith(chrome.runtime.getURL(""))
   );
@@ -15,7 +15,7 @@ async function tabGroupState() {
   const groups = await chrome.tabGroups.query({});
   return {
     tabs: tabs.map(tab => ({
-      id: targetByTab.get(tab.id),
+      id: nativeIds ? `tab-${tab.id}` : targetByTab.get(tab.id),
       chrome_id: tab.id,
       // Chrome may use the URL as its label for an untitled blank page.
       title: tab.url === "about:blank" && tab.title === "about:blank" ? "" : (tab.title || ""),
@@ -42,7 +42,9 @@ async function activeWindowId() {
 }
 
 async function applyApprovedGroups({groups, snapshot, window_id}) {
-  const before = await tabGroupState();
+  // The panel uses Chrome tab IDs; the terminal demo still uses debugging target IDs.
+  const nativeIds = snapshot.every(tab => tab.id.startsWith("tab-"));
+  const before = await tabGroupState(nativeIds);
   const byId = new Map(before.tabs.map(tab => [tab.id, tab]));
   const expectedIds = new Set(snapshot.map(tab => tab.id));
   const proposedIds = groups.flatMap(group => group.tab_ids);
@@ -96,5 +98,5 @@ async function applyApprovedGroups({groups, snapshot, window_id}) {
     // Browser mutations are not transactional; report partial work instead of claiming success.
     throw new Error(`Application stopped; groups already started: ${applied.join(", ")}. ${error.message}`);
   }
-  return await tabGroupState();
+  return await tabGroupState(nativeIds);
 }

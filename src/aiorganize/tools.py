@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import TYPE_CHECKING
 
 from langchain.tools import BaseTool, tool
@@ -5,6 +6,36 @@ from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
 if TYPE_CHECKING:
     from playwright.async_api import BrowserContext, Page, Worker
+
+
+def ambiguous_tab_ids(tabs: list[dict[str, str]]) -> list[str]:
+    """Find generic titles worth inspecting before the first model request."""
+    generic_titles = {"", "new tab", "chatgpt", "claude", "gemini", "copilot"}
+    return [tab["id"] for tab in tabs if tab["title"].strip().casefold() in generic_titles]
+
+
+def extension_tools(tabs: list[dict[str, str]], read_page: Callable[[str], dict]) -> tuple[BaseTool, BaseTool]:
+    """Expose only the panel's snapshot and read requests for tabs in that snapshot."""
+    by_id = {tab["id"]: tab for tab in tabs}
+
+    @tool("list_tabs")
+    def list_extension_tabs() -> list[dict[str, str]]:
+        """List this window's tabs with their IDs, titles, and URLs."""
+        return tabs
+
+    @tool("read_tab")
+    def read_extension_tab(tab_id: str) -> dict:
+        """Read up to 4,000 characters of visible page text for an existing tab ID."""
+        if tab_id not in by_id:
+            return {"id": tab_id, "error": "Tab not found."}
+        result = read_page(tab_id)
+        return {
+            "id": tab_id,
+            "content": str(result.get("content", ""))[:4_000],
+            "note": str(result.get("note", "")),
+        }
+
+    return list_extension_tabs, read_extension_tab
 
 
 async def _chrome_tab_id(context: "BrowserContext", page: "Page") -> str:

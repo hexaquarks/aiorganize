@@ -47,6 +47,12 @@ async def run_live(endpoint: str) -> None:
                 await control_page.close()
         except EOFError:
             print("\nInput ended. No further changes were made.")
+        except Error as error:
+            raise SystemExit(
+                "The terminal demo lost its Chrome connection or control tab. "
+                "Run make apply-chrome again and leave the Chrome window and control tab open. "
+                "For the side panel flow, use make run."
+            ) from error
         finally:
             # A CDP connection is detached without closing the user's running Chrome.
             await browser.close()
