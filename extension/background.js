@@ -4,7 +4,9 @@ chrome.runtime.onInstalled.addListener(() => {});
 
 async function tabGroupState() {
   const targets = await chrome.debugger.getTargets();
-  const tabs = await chrome.tabs.query({});
+  const tabs = (await chrome.tabs.query({})).filter(tab =>
+    tab.url !== chrome.runtime.getURL("control.html")
+  );
   const targetByTab = new Map(
     targets.filter(target => target.tabId !== undefined).map(target => [target.tabId, target.id])
   );
@@ -18,6 +20,7 @@ async function tabGroupState() {
       url: tab.url || "",
       window_id: tab.windowId,
       group_id: tab.groupId,
+      index: tab.index,
     })),
     groups: groups.map(group => ({
       id: group.id,
@@ -28,7 +31,15 @@ async function tabGroupState() {
   };
 }
 
-async function applyApprovedGroups({groups, snapshot}) {
+async function activeWindowId() {
+  const window = await chrome.windows.getLastFocused({windowTypes: ["normal"]});
+  if (!window) {
+    throw new Error("Focus the Chrome window to organize, then try again.");
+  }
+  return window.id;
+}
+
+async function applyApprovedGroups({groups, snapshot, window_id}) {
   const before = await tabGroupState();
   const byId = new Map(before.tabs.map(tab => [tab.id, tab]));
   const expectedIds = new Set(snapshot.map(tab => tab.id));
@@ -51,6 +62,9 @@ async function applyApprovedGroups({groups, snapshot}) {
     throw new Error("This demo only supports one browser window.");
   }
   const windowId = [...windows][0];
+  if (window_id != null && windowId !== window_id) {
+    throw new Error("The selected Chrome window changed. Generate and review a new proposal.");
+  }
   const windowTabs = before.tabs.filter(tab => tab.window_id === windowId);
   if (windowTabs.length !== snapshot.length) {
     throw new Error("Tabs were added after preview. Generate and review a new proposal.");
@@ -58,6 +72,7 @@ async function applyApprovedGroups({groups, snapshot}) {
 
   const colors = ["blue", "green", "yellow", "purple", "cyan", "orange", "pink", "red"];
   const applied = [];
+  let otherGroupId;
   try {
     for (const [index, group] of groups.entries()) {
       const tabIds = group.tab_ids.map(id => byId.get(id).chrome_id);
@@ -65,9 +80,15 @@ async function applyApprovedGroups({groups, snapshot}) {
       applied.push(group.name);
       await chrome.tabGroups.update(groupId, {
         title: group.name,
-        color: group.name.toLowerCase() === "unsorted" ? "grey" : colors[index % colors.length],
+        color: group.name.toLowerCase() === "other" ? "grey" : colors[index % colors.length],
         collapsed: false,
       });
+      if (group.name.toLowerCase() === "other") {
+        otherGroupId = groupId;
+      }
+    }
+    if (otherGroupId !== undefined) {
+      await chrome.tabGroups.move(otherGroupId, {index: -1});
     }
   } catch (error) {
     // Browser mutations are not transactional; report partial work instead of claiming success.

@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "AI Organize Test Groups",
+  "name": "AI Organize Groups",
   "version": "0.1.0",
   "permissions": ["tabs", "tabGroups", "debugger"],
   "background": {"service_worker": "background.js"}

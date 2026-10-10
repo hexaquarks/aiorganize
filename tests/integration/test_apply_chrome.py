@@ -3,10 +3,15 @@ import unittest
 
 from playwright.async_api import Error, async_playwright
 
-from aiorganize.chrome_groups import GROUP_BROWSER_ARGS, apply_groups, load_group_extension
+from aiorganize.chrome_groups import (
+    GROUP_BROWSER_ARGS,
+    apply_groups,
+    load_group_extension,
+    open_group_control_page,
+)
 from aiorganize.proposal import GroupingProposal, TabGroup
 from demos.fixtures import EXTENSION_PATH, create_test_tabs
-from aiorganize.tools import chrome_tab_tool
+from aiorganize.tools import chrome_read_tab_tool, chrome_tab_tool
 
 
 class ChromeGroupTest(unittest.IsolatedAsyncioTestCase):
@@ -30,19 +35,19 @@ class ChromeGroupTest(unittest.IsolatedAsyncioTestCase):
         by_url = {tab["url"]: tab["id"] for tab in self.snapshot}
         self.proposal = GroupingProposal(
             groups=[
+                TabGroup(name="Other", tab_ids=[by_url["about:blank"]]),
                 TabGroup(
-                    name="Programming",
+                    name="Dev",
                     tab_ids=[by_url["https://tabs.test/python"], by_url["https://tabs.test/langchain"]],
                 ),
                 TabGroup(
-                    name="Cooking",
+                    name="Food",
                     tab_ids=[by_url["https://tabs.test/chat"], by_url["https://tabs.test/recipes"]],
                 ),
                 TabGroup(
                     name="Travel",
                     tab_ids=[by_url["https://tabs.test/new"], by_url["https://tabs.test/travel"]],
                 ),
-                TabGroup(name="Unsorted", tab_ids=[by_url["about:blank"]]),
             ]
         )
 
@@ -56,8 +61,17 @@ class ChromeGroupTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(state["tabs"]), len(self.snapshot))
         self.assertEqual(
             {group["name"]: group["color"] for group in state["groups"]},
-            {"Programming": "blue", "Cooking": "green", "Travel": "yellow", "Unsorted": "grey"},
+            {"Dev": "blue", "Food": "green", "Travel": "yellow", "Other": "grey"},
         )
+        other_group = next(group for group in state["groups"] if group["name"] == "Other")
+        other_indices = [
+            tab["index"] for tab in state["tabs"] if tab["group_id"] == other_group["id"]
+        ]
+        topic_indices = [
+            tab["index"] for tab in state["tabs"]
+            if tab["group_id"] != other_group["id"] and tab["group_id"] != -1
+        ]
+        self.assertGreater(min(other_indices), max(topic_indices))
         for proposed in self.proposal.groups:
             actual = next(group for group in state["groups"] if group["name"] == proposed.name)
             members = {tab["id"] for tab in state["tabs"] if tab["group_id"] == actual["id"]}
@@ -94,6 +108,34 @@ class ChromeGroupTest(unittest.IsolatedAsyncioTestCase):
         with self.assertRaisesRegex(Error, "Tabs changed after preview"):
             await apply_groups(self.worker, proposal, snapshot, approved=True)
         await self.assert_no_groups()
+
+    async def test_selected_window_excludes_other_window(self):
+        original_state = await self.worker.evaluate("() => tabGroupState()")
+        window_id = original_state["tabs"][0]["window_id"]
+        await self.worker.evaluate('() => chrome.windows.create({url: "about:blank"})')
+        other_tab = next(
+            tab for tab in (await self.worker.evaluate("() => tabGroupState()"))["tabs"]
+            if tab["window_id"] != window_id
+        )
+        focused_before = await self.worker.evaluate("() => activeWindowId()")
+        control = await open_group_control_page(self.context, EXTENSION_PATH)
+        self.addAsyncCleanup(control.close)
+        self.assertEqual(await control.evaluate("() => activeWindowId()"), focused_before)
+
+        scoped_tabs = await chrome_tab_tool(
+            self.context, worker=control, window_id=window_id
+        ).ainvoke({})
+        self.assertEqual({tab["id"] for tab in scoped_tabs}, {tab["id"] for tab in self.snapshot})
+        read_result = await chrome_read_tab_tool(
+            self.context, worker=control, window_id=window_id
+        ).ainvoke({"tab_id": other_tab["id"]})
+        self.assertEqual(read_result["error"], "Tab not found.")
+
+        state = await apply_groups(
+            control, self.proposal, scoped_tabs, approved=True, window_id=window_id
+        )
+        untouched = next(tab for tab in state["tabs"] if tab["id"] == other_tab["id"])
+        self.assertEqual(untouched["group_id"], -1)
 
 
 if __name__ == "__main__":

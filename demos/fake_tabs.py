@@ -7,9 +7,7 @@ from demos.fake_tools import list_tabs, read_tab
 
 def main() -> None:
     if not os.environ.get("OPENAI_API_KEY"):
-        raise SystemExit(
-            "Set OPENAI_API_KEY or run: make run"
-        )
+        raise SystemExit("Set OPENAI_API_KEY before running the fake tab demo.")
 
     agent = build_agent(list_tabs, read_tab)
     prompt = "Inspect ambiguous tabs and propose topic groups for all the tabs."

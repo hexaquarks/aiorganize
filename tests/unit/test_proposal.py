@@ -1,12 +1,38 @@
 import unittest
+from contextlib import redirect_stdout
+from io import StringIO
 
-from aiorganize.proposal import GroupingProposal, TabGroup
+from aiorganize.proposal import GroupingProposal, TabGroup, print_preview
+from pydantic import ValidationError
 
 
 class ProposalTest(unittest.TestCase):
+    def test_other_group_appears_last_in_preview(self):
+        proposal = GroupingProposal(
+            groups=[
+                TabGroup(name="Other", tab_ids=["one"]),
+                TabGroup(name="Dev", tab_ids=["two"]),
+            ]
+        )
+        output = StringIO()
+        with redirect_stdout(output):
+            print_preview(
+                proposal,
+                [
+                    {"id": "one", "title": "Blank", "url": "about:blank"},
+                    {"id": "two", "title": "Python", "url": "https://example.test"},
+                ],
+            )
+        self.assertLess(output.getvalue().index("\nDev\n"), output.getvalue().index("\nOther\n"))
+
+    def test_group_name_is_short_enough_for_chrome(self):
+        with self.assertRaises(ValidationError):
+            TabGroup(name="Development", tab_ids=["one"])
+        self.assertEqual(TabGroup(name="Dev", tab_ids=["one"]).name, "Dev")
+
     def test_empty_and_duplicate_group_names_are_rejected(self):
         tabs = [{"id": "one"}, {"id": "two"}]
-        for names in ([" ", "Other"], ["Learning", " learning "]):
+        for names in ([" ", "Other"], ["Dev", " dev "]):
             with self.subTest(names=names):
                 proposal = GroupingProposal(
                     groups=[
