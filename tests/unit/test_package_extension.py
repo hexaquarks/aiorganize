@@ -8,8 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 from zipfile import ZipFile
 
-from aiorganize import package_extension
-from aiorganize.package_extension import EXTENSION_FILES, PROJECT, build_zip, chrome_version, tagged_files
+from src import package_extension
+from src.package_extension import EXTENSION_FILES, PROJECT, build_zip, chrome_version, tagged_files
 
 
 class PackageExtensionTest(unittest.TestCase):
@@ -29,6 +29,11 @@ class PackageExtensionTest(unittest.TestCase):
             self.assertEqual(archive.namelist(), sorted(EXTENSION_FILES))
             manifest = json.loads(archive.read("manifest.json"))
             self.assertNotIn("debugger", manifest["permissions"])
+            self.assertNotIn("nativeMessaging", manifest["permissions"])
+            self.assertNotIn("scripting", manifest["permissions"])
+            self.assertEqual(manifest["host_permissions"], ["https://api.openai.com/*"])
+            self.assertNotIn("page-reader.js", archive.namelist())
+            self.assertNotIn(b"companion", archive.read("panel-entry.js"))
             self.assertEqual(manifest["version"], "0.1.0")
             for icon in manifest["icons"].values():
                 self.assertTrue(archive.read(icon).startswith(b"\x89PNG\r\n\x1a\n"))

@@ -4,8 +4,8 @@ from pathlib import Path
 
 from playwright.async_api import BrowserContext, Error, async_playwright
 
-from aiorganize.chrome_groups import open_group_control_page
-from aiorganize.install_companion import install_companion
+from src.chrome_groups import open_group_control_page
+from src.install_companion import install_companion
 from demos.chrome_session import DEBUG_ENDPOINT, PROFILE_PATH, ensure_debug_chrome
 from demos.fixtures import EXTENSION_PATH
 
@@ -17,6 +17,7 @@ async def prepare_extension(context: BrowserContext, profile: Path) -> Path:
     control_page = await open_group_control_page(context, EXTENSION_PATH)
     try:
         extension_id = await control_page.evaluate("() => chrome.runtime.id")
+        await control_page.evaluate("() => chrome.storage.local.set({developmentCompanion: true})")
         project = EXTENSION_PATH.parent
         return install_companion(extension_id, project, profile / "NativeMessagingHosts")
     finally:

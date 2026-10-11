@@ -38,7 +38,7 @@ class NativeCompanionTestCase(test_panel.PanelTestCase):
         await self.panel.evaluate("""async hostName => {
             const {panel} = await import('./panel-entry.js');
             const {mountPanel} = await import('./panel.js');
-            const {requestProposal} = await import('./proposal-client.js');
+            const {requestProposal} = await import('./companion-client.js');
             panel.destroy();
             // The production panel must not need remote debugging to identify or read tabs.
             if (chrome.debugger) {
@@ -96,7 +96,7 @@ class NativeCompanionTest(NativeCompanionTestCase):
 
     async def test_cancelling_a_request_disconnects_its_native_port(self):
         result = await self.panel.evaluate("""async () => {
-            const {requestProposal} = await import('./proposal-client.js');
+            const {requestProposal} = await import('./companion-client.js');
             const original = chrome.runtime.connectNative;
             let disconnected = 0;
             chrome.runtime.connectNative = () => ({

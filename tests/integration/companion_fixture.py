@@ -9,7 +9,7 @@ from langchain.messages import AIMessage
 from langchain_core.language_models.fake_chat_models import FakeMessagesListChatModel
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-from aiorganize.companion import main
+from src.companion import main
 
 
 class PanelFixtureModel(FakeMessagesListChatModel):
@@ -42,6 +42,6 @@ class PanelFixtureModel(FakeMessagesListChatModel):
 if __name__ == "__main__":
     # No provider request or real credential is used by this fixture.
     with patch.dict(os.environ, {"OPENAI_API_KEY": "test-only"}), patch(
-        "aiorganize.agent.ChatOpenAI", return_value=PanelFixtureModel(responses=[])
+        "src.agent.ChatOpenAI", return_value=PanelFixtureModel(responses=[])
     ):
         main()

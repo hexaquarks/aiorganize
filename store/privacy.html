@@ -2,39 +2,28 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Organize Groups — Privacy policy draft</title>
+<title>AI Organize Groups — Privacy policy</title>
 <style>
   body { max-width: 720px; margin: 48px auto; padding: 0 24px; font: 16px/1.6 system-ui, sans-serif; }
 </style>
 <h1>AI Organize Groups privacy policy</h1>
-<p>Draft for owner review. Before publication, add the developer's contact address and effective date
-  and host this policy at the URL entered in the Chrome Web Store.</p>
-<h2>Data used to organize tabs</h2>
-<p>When you click Organize tabs, the extension reads tab titles, full URLs, and tab identifiers for the
-  current window. It can read up to 4,000 characters of visible text from each inspected page, including
-  signed-in pages. Titles, URLs, and page text can contain sensitive personal information. The extension
-  does not filter that information out. Only request grouping for a window whose content you are willing
-  to send to OpenAI.</p>
-<h2>Local companion and OpenAI</h2>
-<p>The extension sends tab context to a Python companion installed on your computer through Chrome
-  native messaging. The companion sends titles, URLs, internal tab identifiers, and inspected page text
-  to the OpenAI API to generate proposed groups. The model may request additional page text during
-  that request. This data is processed for the grouping feature, not for sale, advertising, or credit decisions.</p>
-<p>Your OpenAI API key is stored in your local environment or companion configuration. It is used to
-  authenticate to OpenAI and is not bundled in or sent to the extension. OpenAI's handling and retention
-  of API data depend on its policies and your account settings. See
-  <a href="https://platform.openai.com/docs/guides/your-data">OpenAI's API data controls</a>.
-  This feature is not entirely offline.</p>
-<h2>Storage and controls</h2>
-<p>The application does not maintain a browsing database, save proposal history, or include analytics.
-  Tab context and proposals are held in memory for a request. Your local configuration, Chrome's applied
-  groups, and any separately enabled provider or environment logging have their own lifetimes.
-  Rejecting a proposal prevents tab changes but does not undo data already sent for generation.</p>
-<p>Chrome tab groups change only after you approve a proposal. Stop using or uninstall the extension to
-  stop future requests. Uninstalling the extension does not remove the separately installed Python
-  companion or your local API key configuration. Remove those separately if no longer needed.
-  Provider-held data is subject to the provider's controls.</p>
+<p>Effective date: October 11, 2026.</p>
+<h2>What is shared</h2>
+<p>When you request tab groups, the extension sends tab titles, URLs, and identifiers to the
+  model provider over HTTPS. Titles and URLs may contain sensitive information. Page contents are
+  not read or sent. The current version supports OpenAI;
+  its <a href="https://platform.openai.com/docs/guides/your-data">data policies</a> apply to information
+  it receives. Requests disable response storage; other provider retention may still apply.</p>
+<p>This information is used only to generate your requested groups. The developer does not receive
+  your browsing data, sell it, use it for advertising, or include analytics.</p>
+<h2>What is stored</h2>
+<p>Your API key stays in extension-only session storage unless you choose Remember key, which saves
+  it locally without encryption. It is sent only to the model provider for authentication and never
+  synced through Chrome. Forget key deletes it. Model settings are stored locally; proposal history
+  is not saved. Uninstalling removes stored settings.</p>
+<p>Groups change only after approval. Rejecting a proposal does not undo information already sent
+  to the provider.</p>
 <h2>Contact</h2>
-<p>Developer contact: to be supplied by the owner before publication. Do not send private tab contents
-  or API keys in support requests.</p>
+<p><a href="mailto:seseriusca@gmail.com">seseriusca@gmail.com</a>. Support emails are used to respond
+  to your request. Please do not include API keys or private tab contents.</p>
 </html>

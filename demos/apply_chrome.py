@@ -6,11 +6,11 @@ from tempfile import TemporaryDirectory
 from langchain.messages import AIMessage, ToolMessage
 from playwright.async_api import BrowserContext, Page, Worker, async_playwright
 
-from aiorganize.agent import build_agent
-from aiorganize.chrome_groups import GROUP_BROWSER_ARGS, apply_groups, load_group_extension
-from aiorganize.proposal import GroupingProposal, print_preview
-from aiorganize.terminal import print_message
-from aiorganize.tools import chrome_read_tab_tool, chrome_tab_tool
+from src.agent import build_agent
+from src.chrome_groups import GROUP_BROWSER_ARGS, apply_groups, load_group_extension
+from src.proposal import GroupingProposal, print_preview
+from src.terminal import print_message
+from src.tools import chrome_read_tab_tool, chrome_tab_tool
 from demos.fixtures import EXTENSION_PATH, create_test_tabs
 
 

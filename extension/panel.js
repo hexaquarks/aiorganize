@@ -82,7 +82,7 @@ function renderGroups(root, groups, snapshot) {
   }
 }
 
-// Keep proposal generation separate so the browser UI does not own model credentials.
+// Proposal generation is read-only; browser mutations remain behind explicit approval.
 export function mountPanel(root, propose = requestProposal) {
   const listeners = new AbortController();
   const organize = root.querySelector("#organize");

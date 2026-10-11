@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 
 from playwright.async_api import Error, async_playwright
 
-from aiorganize.chrome_groups import open_group_control_page
+from src.chrome_groups import open_group_control_page
 from demos.apply_chrome import review_and_apply
 from demos.chrome_session import DEBUG_ENDPOINT, ensure_debug_chrome
 from demos.fixtures import EXTENSION_PATH

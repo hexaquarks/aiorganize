@@ -3,15 +3,15 @@ import unittest
 
 from playwright.async_api import Error, async_playwright
 
-from aiorganize.chrome_groups import (
+from src.chrome_groups import (
     GROUP_BROWSER_ARGS,
     apply_groups,
     load_group_extension,
     open_group_control_page,
 )
-from aiorganize.proposal import GroupingProposal, TabGroup
+from src.proposal import GroupingProposal, TabGroup
 from demos.fixtures import EXTENSION_PATH, create_test_tabs
-from aiorganize.tools import chrome_read_tab_tool, chrome_tab_tool
+from src.tools import chrome_read_tab_tool, chrome_tab_tool
 
 
 class ChromeGroupTest(unittest.IsolatedAsyncioTestCase):
