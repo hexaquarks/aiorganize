@@ -1,0 +1,38 @@
+{
+  "name": "AI Organize Groups",
+  "summary": "Preview AI topic groups for your tabs, then approve to apply. Requires a local Python companion and OpenAI API key.",
+  "description": "Organize the tabs in your current Chrome window into topic groups. Click Organize tabs, review the proposed groups, then approve to apply or reject to leave your tabs unchanged. Ambiguous pages can be inspected to improve grouping.\n\nRequires a separately installed local Python companion on macOS or Linux, uv, and your own OpenAI API key with access to the configured model. OpenAI API charges may apply. Windows companion registration is not supported.\n\nWhen you request a proposal, tab titles, URLs, and inspected page text are sent through the local companion to OpenAI. The API key stays in your local companion configuration. This private development release is intended only for its owner's Google account.",
+  "single_purpose": "Propose and apply topic-based Chrome tab groups after the user reviews and approves them.",
+  "permission_justifications": {
+    "tabs": "Read titles, URLs, and tab IDs to propose groups and recheck the selected window before applying them.",
+    "tabGroups": "Read existing groups and create, name, color, and move groups after approval.",
+    "sidePanel": "Display the grouping request, preview, rejection, and approval controls.",
+    "nativeMessaging": "Exchange tab context and proposals with the separately installed local Python companion; credentials remain local.",
+    "scripting": "Read up to 4,000 characters of visible text from each inspected page during a user-requested proposal.",
+    "http://*/* and https://*/*": "Inspect pages across the current window, including background tabs on unrelated sites. A single active-tab grant cannot cover those pages. No persistent content scripts are installed."
+  },
+  "remote_code": false,
+  "remote_code_explanation": "All extension JavaScript is bundled. The local Python companion calls OpenAI for structured data; the extension does not execute model responses as code.",
+  "data_disclosures": {
+    "required_categories": ["Web history", "Website content"],
+    "review_before_submission": "Titles, full URLs, and inspected text can contain personal, health, financial, authentication, location, or communication data. Review the current dashboard categories against this unrestricted page-content access; do not claim these sensitive contents are filtered out.",
+    "purpose": "Generate the grouping proposal requested by the user.",
+    "recipients": "The local Python companion and OpenAI API under the owner's API account.",
+    "sale_or_advertising": false
+  },
+  "assets": {
+    "icon": "extension/icons/128.png",
+    "small_promo": "store/promo-440x280.png",
+    "screenshot": "store/preview-1280x800.png",
+    "screenshot_note": "Actual panel rendered with offline sample tabs and a deterministic proposal; no personal browsing data."
+  },
+  "distribution": {
+    "visibility": "Private",
+    "audience": "Only trusted testers from the current publisher settings",
+    "trusted_testers": "Owner's Google account only; confirm in the dashboard before submission.",
+    "google_groups": [],
+    "domain_distribution": false
+  },
+  "pending_owner_fields": ["Google account for trusted testing", "Developer contact email", "Hosted privacy policy URL"],
+  "publishing_status": "Not uploaded or published. Owner-only store installation and update verification are pending."
+}

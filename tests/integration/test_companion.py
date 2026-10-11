@@ -11,7 +11,7 @@ from demos.extension_chrome import prepare_extension
 from tests.integration import test_panel
 
 
-class NativeCompanionTest(test_panel.PanelTestCase):
+class NativeCompanionTestCase(test_panel.PanelTestCase):
     async def install_native_fixture(self, *, failure=False):
         host_name = "com.aiorganize.test_" + uuid.uuid4().hex
         origin = self.worker.url.removesuffix("background.js")
@@ -41,10 +41,14 @@ class NativeCompanionTest(test_panel.PanelTestCase):
             const {requestProposal} = await import('./proposal-client.js');
             panel.destroy();
             // The production panel must not need remote debugging to identify or read tabs.
-            chrome.debugger.getTargets = () => { throw new Error('Debugging is unavailable'); };
+            if (chrome.debugger) {
+                chrome.debugger.getTargets = () => { throw new Error('Debugging is unavailable'); };
+            }
             mountPanel(document, request => requestProposal(request, {hostName}));
         }""", host_name)
 
+
+class NativeCompanionTest(NativeCompanionTestCase):
     async def test_native_agent_inspection_rejection_and_approval(self):
         await self.context.new_page()
         other_window = await self.worker.evaluate("() => chrome.windows.create({url: 'about:blank'})")
