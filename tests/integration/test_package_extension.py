@@ -7,7 +7,7 @@ from zipfile import ZipFile
 
 from playwright.async_api import expect
 
-from aiorganize.package_extension import EXTENSION_FILES, PROJECT, build_zip
+from src.package_extension import EXTENSION_FILES, PROJECT, build_zip
 from tests.integration.test_panel import PanelTestCase
 
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright, expect
 
-from aiorganize.chrome_groups import GROUP_BROWSER_ARGS, load_group_extension
+from src.chrome_groups import GROUP_BROWSER_ARGS, load_group_extension
 from demos.fixtures import EXTENSION_PATH, create_test_tabs
 
 

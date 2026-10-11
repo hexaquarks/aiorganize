@@ -12,9 +12,9 @@ from unittest.mock import patch
 
 from pydantic import ValidationError
 
-from aiorganize.companion import OrganizeRequest, read_message, serve, write_message
-from aiorganize.install_companion import install_companion
-from aiorganize.tools import extension_tools
+from src.companion import OrganizeRequest, read_message, serve, write_message
+from src.install_companion import install_companion
+from src.tools import extension_tools
 
 
 def request_frame(**changes):
@@ -60,7 +60,7 @@ class CompanionTest(unittest.TestCase):
         self.assertIn("OPENAI_API_KEY", read_message(output)["message"])
         output = io.BytesIO()
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-only"}), patch(
-            "aiorganize.companion.build_agent", side_effect=RuntimeError("sensitive provider detail")
+            "src.companion.build_agent", side_effect=RuntimeError("sensitive provider detail")
         ):
             request = read_message(request_frame())
             request["snapshot"][0]["title"] = "Python tutorial"
@@ -76,7 +76,7 @@ class CompanionTest(unittest.TestCase):
 
     def test_native_entry_point_rejects_other_extensions_before_reading(self):
         result = subprocess.run([
-            sys.executable, "-m", "aiorganize.companion", "--allowed-origin",
+            sys.executable, "-m", "src.companion", "--allowed-origin",
             "chrome-extension://allowed/", "chrome-extension://other/",
         ], input=b"", capture_output=True, timeout=10)
         self.assertNotEqual(result.returncode, 0)
@@ -123,7 +123,7 @@ class CompanionTest(unittest.TestCase):
             return SimpleNamespace(invoke=invoke)
 
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-only"}), patch(
-            "aiorganize.companion.build_agent", side_effect=build_test_agent,
+            "src.companion.build_agent", side_effect=build_test_agent,
         ):
             serve(source, output)
 

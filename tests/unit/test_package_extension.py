@@ -8,8 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 from zipfile import ZipFile
 
-from aiorganize import package_extension
-from aiorganize.package_extension import EXTENSION_FILES, PROJECT, build_zip, chrome_version, tagged_files
+from src import package_extension
+from src.package_extension import EXTENSION_FILES, PROJECT, build_zip, chrome_version, tagged_files
 
 
 class PackageExtensionTest(unittest.TestCase):

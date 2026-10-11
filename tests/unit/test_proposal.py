@@ -2,7 +2,7 @@ import unittest
 from contextlib import redirect_stdout
 from io import StringIO
 
-from aiorganize.proposal import GroupingProposal, TabGroup, print_preview
+from src.proposal import GroupingProposal, TabGroup, print_preview
 from pydantic import ValidationError
 
 

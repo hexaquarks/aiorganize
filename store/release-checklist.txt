@@ -14,7 +14,7 @@ v<version> Git tag on the reviewed release commit. Tags are the extension's rele
 the full history and tags before release checks. Versions have 1–4 numeric parts, each 0–65535,
 no leading zeros, and cannot be all zero. Missing components compare as zero.
 After the release tag exists, run:
-  uv run python -m aiorganize.package_extension --tag v0.1.0
+  uv run python -m src.package_extension --tag v0.1.0
 The builder reads only the tag's committed files, checks ancestor release versions, and emits a ZIP
 and SHA-256 sidecar in dist/. It does not create tags, push, upload, or publish.
 If the latest store version has no ancestor tag, also pass --previous-version <latest-store-version>.
@@ -67,13 +67,13 @@ Keep these values in the ignored local .env (or environment), never in the relea
   CWS_REFRESH_TOKEN
 
 Read status with make store-status. For each reviewed, tagged version, upload with:
-  uv run --env-file .env python -m aiorganize.webstore release --tag v0.2.0
+  uv run --env-file .env python -m src.webstore release --tag v0.2.0
 The command builds committed tag files, compares versions against the store and ancestor tags,
 and waits for upload processing. Upload alone does not submit for review or publish.
 
 When publishing is authorized, check that the dashboard's trusted tester list still contains ONLY
 the owner's account, then upload and submit the private update with:
-  uv run --env-file .env python -m aiorganize.webstore release --tag v0.2.0 --publish-private --confirm-owner-only
+  uv run --env-file .env python -m src.webstore release --tag v0.2.0 --publish-private --confirm-owner-only
 This requires the existing item to be PUBLISHED_TO_TESTERS. It retains existing visibility, requests
 normal review, and blocks on Google warnings. The API does not expose tester identities; the flag
 confirms your dashboard check. Google controls review timing. The command does not push or create tags.

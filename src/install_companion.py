@@ -34,7 +34,7 @@ def install_companion(extension_id: str, project: Path, manifest_directory: Path
     launcher = directory / f"{HOST_NAME}.sh"
     origin = f"chrome-extension://{extension_id}/"
     command = [uv, "run", "--project", str(project)]
-    entry_point = ["python", "-m", "aiorganize.companion", "--allowed-origin", origin]
+    entry_point = ["python", "-m", "src.companion", "--allowed-origin", origin]
     env_file = project / ".env"
     # Check at launch so creating or updating .env never requires re-registration.
     launcher.write_text(
@@ -60,7 +60,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Register the local companion for an unpacked Chrome extension.")
     parser.add_argument("--extension-id", required=True, help="The ID shown in chrome://extensions.")
     args = parser.parse_args()
-    project = Path(__file__).resolve().parents[2]
+    project = Path(__file__).resolve().parents[1]
     try:
         manifest = install_companion(args.extension_id, project)
     except ValueError as error:

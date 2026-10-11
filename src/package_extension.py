@@ -11,7 +11,7 @@ from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile, ZipInfo
 
 
-PROJECT = Path(__file__).resolve().parents[2]
+PROJECT = Path(__file__).resolve().parents[1]
 # An explicit list prevents local configuration and future demo files entering releases.
 EXTENSION_FILES = (
     "background.js", "manifest.json", "panel-entry.js", "panel.css", "panel.html",

@@ -4,8 +4,8 @@ from pathlib import Path
 
 from playwright.async_api import BrowserContext, Error, async_playwright
 
-from aiorganize.chrome_groups import open_group_control_page
-from aiorganize.install_companion import install_companion
+from src.chrome_groups import open_group_control_page
+from src.install_companion import install_companion
 from demos.chrome_session import DEBUG_ENDPOINT, PROFILE_PATH, ensure_debug_chrome
 from demos.fixtures import EXTENSION_PATH
 

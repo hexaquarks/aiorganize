@@ -7,9 +7,9 @@ from tempfile import TemporaryDirectory
 from langchain.messages import AIMessage, ToolMessage
 from playwright.async_api import async_playwright
 
-from aiorganize.agent import build_agent
-from aiorganize.terminal import print_message
-from aiorganize.tools import chrome_read_tab_tool, chrome_tab_tool
+from src.agent import build_agent
+from src.terminal import print_message
+from src.tools import chrome_read_tab_tool, chrome_tab_tool
 from demos.fixtures import CHAT_CONTENT, TEST_TABS, create_test_tabs
 
 

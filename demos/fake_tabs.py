@@ -1,7 +1,7 @@
 import os
 
-from aiorganize.agent import build_agent
-from aiorganize.terminal import print_message
+from src.agent import build_agent
+from src.terminal import print_message
 from demos.fake_tools import list_tabs, read_tab
 
 

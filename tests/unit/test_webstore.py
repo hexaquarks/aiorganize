@@ -5,9 +5,9 @@ from unittest.mock import Mock, patch
 from urllib.error import HTTPError
 from urllib.parse import parse_qs
 
-from aiorganize import webstore
-from aiorganize.package_extension import EXTENSION_FILES, PROJECT
-from aiorganize.webstore import WebStoreClient, release, request_json, store_versions
+from src import webstore
+from src.package_extension import EXTENSION_FILES, PROJECT
+from src.webstore import WebStoreClient, release, request_json, store_versions
 
 
 PRIVATE_STATUS = {
