@@ -1,7 +1,10 @@
+import {SUPPORTED_MODELS} from "./model-catalog.js";
+
 export class ModelListError extends Error {}
 
 function isTextModel(id) {
   const base = id.startsWith("ft:") ? id.split(":")[1] : id;
+  if (SUPPORTED_MODELS.some(model => model.id === base)) return true;
   // The models endpoint has no capability metadata. Exclude known incompatible families;
   // the synthetic connection test determines whether a candidate supports our schema.
   const incompatible = /audio|realtime|transcrib|tts|image|search|instruct|embedding|moderation|computer-use|oss/i;

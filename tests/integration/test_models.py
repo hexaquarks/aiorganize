@@ -43,19 +43,19 @@ class ModelDiscoveryTest(PanelTestCase):
         await expect(self.panel.locator("#model-discovery-status")).to_contain_text("then newest")
         await expect(self.panel.get_by_role("listbox")).to_be_visible()
         self.assertEqual(await self.panel.get_by_role("option").all_text_contents(), [
-            "GPT-4.1 mini", "gpt-5-mini", "gpt-5", "gpt-5-2025-08-07", "o3",
+            "GPT-4.1 mini", "GPT-5 Mini", "GPT-5", "gpt-5-2025-08-07", "o3",
             "ft:gpt-4.1-mini:example:custom",
         ])
         self.assertEqual(len(requests), 1)
         self.assertEqual(requests[0].method, "GET")
         self.assertEqual(requests[0].headers["authorization"], "Bearer model-list-test-key")
         self.assertIsNone(requests[0].post_data)
-        await self.panel.get_by_role("option", name="gpt-5-mini", exact=True).click()
+        await self.panel.get_by_role("option", name="GPT-5 Mini", exact=True).click()
         await expect(self.panel.locator("#organize")).to_be_disabled()
         settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
         self.assertFalse(settings["apiKey"])
         await self.panel.locator("#api-model").click()
-        await expect(self.panel.get_by_role("option", name="gpt-5-mini", exact=True)).to_be_focused()
+        await expect(self.panel.get_by_role("option", name="GPT-5 Mini", exact=True)).to_be_focused()
         self.assertEqual(len(requests), 1)
         await self.panel.set_viewport_size({"width": 462, "height": 800})
         await self.panel.screenshot(path="dist/available-models-preview.png", full_page=True)
@@ -145,7 +145,7 @@ class ModelDiscoveryTest(PanelTestCase):
             ]})
 
         await self.panel.route("https://api.openai.com/v1/models", respond)
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("Showing defaults")
+        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("Supported models")
         await expect(self.panel.locator("#refresh-models")).to_be_disabled()
         await self.panel.locator("#api-key").fill("automatic-discovery-test-key")
         await expect(self.panel.locator("#model-discovery-status")).to_contain_text("2 account models loaded")
@@ -158,7 +158,7 @@ class ModelDiscoveryTest(PanelTestCase):
         self.assertEqual(len(requests), 2)
         await self.panel.locator("#api-key").fill("")
         await expect(self.panel.locator("#refresh-models")).to_be_disabled()
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("Showing defaults")
+        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("Supported models")
 
     async def test_saved_unverified_key_loads_models_on_startup(self):
         await self.panel.evaluate("""() => chrome.storage.session.set({apiKey: 'startup-test-key'})""")
@@ -176,3 +176,44 @@ class ModelDiscoveryTest(PanelTestCase):
         await self.panel.locator("#api-model").click()
         await expect(self.panel.get_by_role("option", name="gpt-5-startup-model", exact=True)).to_be_visible()
         await expect(self.panel.locator("#organize")).to_be_disabled()
+
+    async def test_full_supported_catalog_is_available_before_key_entry(self):
+        requests = []
+        await self.panel.unroute("https://api.openai.com/v1/models")
+
+        async def respond(route):
+            requests.append(route.request)
+            await route.abort()
+
+        await self.panel.route("https://api.openai.com/v1/models", respond)
+        await expect(self.panel.locator("#api-key")).to_be_empty()
+        await self.panel.locator("#api-model").click()
+        options = self.panel.get_by_role("option")
+        await expect(options).to_have_count(57)
+        ids = await options.evaluate_all("elements => elements.map(element => element.dataset.value)")
+        expected_aliases = {
+            "gpt-4.1-mini", "gpt-4.1", "gpt-4.1-nano", "gpt-4o", "gpt-4o-mini",
+            "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro", "gpt-5.1", "gpt-5.2",
+            "gpt-5.3-codex", "gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano", "gpt-5.5",
+            "gpt-5.5-pro", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-5.6-cyber",
+            "gpt-6-astra", "gpt-6-sol", "gpt-6-luna", "gpt-6.1-sol", "chat-latest",
+            "gpt-daybreak-blue-latest", "gpt-daybreak-red-latest",
+            "o1", "o1-pro", "o3", "o3-mini", "o3-pro", "o4-mini",
+        }
+        self.assertTrue(expected_aliases.issubset(ids))
+        self.assertEqual(ids[0], "gpt-4.1-mini")
+        self.assertEqual(len(ids), len(set(ids)))
+        for unsupported in ["gpt-3.5-turbo", "gpt-4", "gpt-4.5-preview", "codex-mini-latest",
+                            "gpt-5.2-pro", "gpt-5.4-pro", "gpt-image-1", "gpt-audio", "gpt-oss-120b"]:
+            self.assertNotIn(unsupported, ids)
+        self.assertEqual(requests, [])
+        await self.panel.get_by_role("option", name="GPT-6.1 Sol", exact=True).click()
+        self.assertEqual(await self.panel.locator("#api-model").evaluate("element => element.value"), "gpt-6.1-sol")
+        await expect(self.panel.locator("#test-connection")).to_be_disabled()
+        await expect(self.panel.locator("#organize")).to_be_disabled()
+        await self.panel.reload()
+        await self.panel.locator("#api-model").click()
+        await expect(self.panel.get_by_role("option")).to_have_count(57)
+        self.assertEqual(requests, [])
+        await self.panel.set_viewport_size({"width": 462, "height": 800})
+        await self.panel.screenshot(path="dist/models-before-key-preview.png", full_page=True)

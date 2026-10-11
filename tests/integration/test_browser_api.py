@@ -60,6 +60,10 @@ class BrowserApiTest(PanelTestCase):
         self.assertFalse((self.extension_path / "companion-client.js").exists())
         self.assertFalse((self.extension_path / "page-reader.js").exists())
         await expect(self.panel.locator("#organize")).to_be_disabled()
+        await self.panel.locator("#api-model").click()
+        await expect(self.panel.get_by_role("option")).to_have_count(57)
+        await expect(self.panel.get_by_role("option", name="GPT-6.1 Sol", exact=True)).to_have_count(1)
+        await self.panel.keyboard.press("Escape")
         await self.assert_no_groups()
 
     async def test_browser_request_uses_only_metadata_and_applies_only_after_approval(self):

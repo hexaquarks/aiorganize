@@ -1,12 +1,8 @@
+import {SUPPORTED_MODELS} from "./model-catalog.js";
 import {fetchModels, ModelListError} from "./models.js";
 import {mountModelPicker} from "./model-picker.js";
 
 export const DEFAULT_MODEL = "gpt-4.1-mini";
-// These defaults remain usable when model discovery is unavailable.
-export const FALLBACK_MODELS = [
-  {id: DEFAULT_MODEL, name: "GPT-4.1 mini", note: "Fast and affordable for grouping tabs."},
-  {id: "gpt-4.1", name: "GPT-4.1", note: "More capable for complex topics."},
-];
 
 async function restrictStorage() {
   await chrome.storage.local.setAccessLevel({accessLevel: "TRUSTED_CONTEXTS"});
@@ -60,7 +56,7 @@ export async function mountSettings(root, testConnection) {
   let editing = true;
   let testing = false;
 
-  let availableModels = [...FALLBACK_MODELS];
+  let availableModels = [...SUPPORTED_MODELS];
   let loadedForKey = "";
   let loadedAt = 0;
   let discovery = null;
@@ -74,15 +70,15 @@ export async function mountSettings(root, testConnection) {
     discovery?.abort();
     discovery = null;
     loadedForKey = "";
-    availableModels = [...FALLBACK_MODELS];
+    availableModels = [...SUPPORTED_MODELS];
     preserveSelection();
-    modelStatus.textContent = "Showing defaults. Enter your API key to load account models.";
+    modelStatus.textContent = "Supported models · enter your key to check account availability.";
   }
 
   function preserveSelection() {
     if (!availableModels.some(item => item.id === model.value)) {
       availableModels.push({
-        id: model.value, name: FALLBACK_MODELS.find(item => item.id === model.value)?.name || model.value,
+        id: model.value, name: SUPPORTED_MODELS.find(item => item.id === model.value)?.name || model.value,
         note: "Not listed for this key. Test the connection to check access.",
       });
     }
@@ -103,7 +99,7 @@ export async function mountSettings(root, testConnection) {
       if (controller.signal.aborted || key.value.trim() !== apiKey) return;
       availableModels = items.map(item => ({
         ...item,
-        name: FALLBACK_MODELS.find(fallback => fallback.id === item.id)?.name || item.name,
+        name: SUPPORTED_MODELS.find(fallback => fallback.id === item.id)?.name || item.name,
       }));
       availableModels.sort((a, b) => Number(b.id === DEFAULT_MODEL) - Number(a.id === DEFAULT_MODEL));
       preserveSelection();
@@ -177,7 +173,7 @@ export async function mountSettings(root, testConnection) {
   function showSaved() {
     editing = false;
     key.value = "";
-    const label = FALLBACK_MODELS.find(item => item.id === saved.model)?.name || saved.model;
+    const label = SUPPORTED_MODELS.find(item => item.id === saved.model)?.name || saved.model;
     const storageLabel = saved.remember ? "Remembered on this device" : "Session only";
     root.querySelector("#connection-detail").textContent = `${label} · ${storageLabel}`;
     const time = new Date(saved.verifiedAt);
