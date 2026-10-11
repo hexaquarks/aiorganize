@@ -1,4 +1,4 @@
-import {fetchModels} from "./models.js";
+import {fetchModels, ModelListError} from "./models.js";
 import {mountModelPicker} from "./model-picker.js";
 
 export const DEFAULT_MODEL = "gpt-4.1-mini";
@@ -64,16 +64,19 @@ export async function mountSettings(root, testConnection) {
   let loadedForKey = "";
   let loadedAt = 0;
   let discovery = null;
+  let discoveryTimer = null;
   const modelStatus = root.querySelector("#model-discovery-status");
+  const refreshButton = root.querySelector("#refresh-models");
   const modelPicker = mountModelPicker(root, availableModels, () => { refreshModels(); });
 
   function resetModels() {
+    clearTimeout(discoveryTimer);
     discovery?.abort();
     discovery = null;
     loadedForKey = "";
     availableModels = [...FALLBACK_MODELS];
     preserveSelection();
-    modelStatus.textContent = "Enter your key to load available models.";
+    modelStatus.textContent = "Showing defaults. Enter your API key to load account models.";
   }
 
   function preserveSelection() {
@@ -86,12 +89,14 @@ export async function mountSettings(root, testConnection) {
     modelPicker.setModels(availableModels);
   }
 
-  async function refreshModels() {
+  async function refreshModels(force = false) {
     const apiKey = key.value.trim();
     const cached = loadedForKey === apiKey && Date.now() - loadedAt < 300000;
-    if (!apiKey || testing || cached || discovery) return;
+    clearTimeout(discoveryTimer);
+    if (!apiKey || testing || (!force && cached) || discovery) return;
     const controller = new AbortController();
     discovery = controller;
+    refreshButton.disabled = true;
     modelStatus.textContent = "Loading available models…";
     try {
       const items = await fetchModels(apiKey, controller.signal);
@@ -104,15 +109,18 @@ export async function mountSettings(root, testConnection) {
       preserveSelection();
       loadedForKey = apiKey;
       loadedAt = Date.now();
-      modelStatus.textContent = items.length ? "Available models · default first, then newest." :
+      modelStatus.textContent = items.length ?
+        `${items.length} account models loaded · default first, then newest.` :
         "No text models found. You can still test a custom model ID.";
       update();
-    } catch {
+    } catch (error) {
       if (!controller.signal.aborted) {
-        modelStatus.textContent = "Could not load models. Reopen the menu to retry, or use a custom ID.";
+        modelStatus.textContent = error instanceof ModelListError ? error.message :
+          "Could not reach the model list. Check your connection and refresh, or use a custom ID.";
       }
     } finally {
       if (discovery === controller) discovery = null;
+      refreshButton.disabled = testing || Boolean(discovery) || !key.value.trim();
     }
   }
 
@@ -135,6 +143,7 @@ export async function mountSettings(root, testConnection) {
     root.querySelector("#key-label").textContent = saved.apiKey ? "Replace key" : "OpenAI API key";
     root.querySelector("#cancel-settings").disabled = testing;
     form.setAttribute("aria-busy", String(testing));
+    refreshButton.disabled = testing || Boolean(discovery) || !key.value.trim();
     model.disabled = Boolean(custom.value.trim());
     if (testing || model.disabled) modelPicker.close();
     submit.disabled = testing || !key.value.trim() || !selectedModel();
@@ -184,7 +193,10 @@ export async function mountSettings(root, testConnection) {
     saved = await getSettings();
     fillDraft();
     if (saved.apiKey && saved.verifiedAt) showSaved();
-    else update();
+    else {
+      update();
+      refreshModels();
+    }
   } catch {
     feedback.hidden = false;
     feedback.textContent = "Could not load settings. Reload the extension.";
@@ -194,8 +206,13 @@ export async function mountSettings(root, testConnection) {
   for (const field of [key, model, custom, remember]) {
     field.addEventListener("input", () => { feedback.hidden = true; update(); });
   }
-  key.addEventListener("input", () => { resetModels(); update(); });
+  key.addEventListener("input", () => {
+    resetModels();
+    update();
+    if (key.value.trim()) discoveryTimer = setTimeout(() => { refreshModels(); }, 600);
+  });
   key.addEventListener("blur", () => { refreshModels(); });
+  refreshButton.addEventListener("click", () => { refreshModels(true); });
   root.querySelector("#reveal-key").addEventListener("click", event => {
     key.type = key.type === "password" ? "text" : "password";
     event.currentTarget.setAttribute("aria-label", key.type === "password" ? "Show API key" : "Hide API key");
@@ -214,6 +231,7 @@ export async function mountSettings(root, testConnection) {
       feedback.textContent = "Enter a valid key and model ID.";
       return;
     }
+    clearTimeout(discoveryTimer);
     discovery?.abort();
     discovery = null;
     testing = true;

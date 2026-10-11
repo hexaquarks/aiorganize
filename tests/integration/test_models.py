@@ -95,11 +95,11 @@ class ModelDiscoveryTest(PanelTestCase):
 
         await self.panel.route("https://api.openai.com/v1/models", respond)
         await self.panel.locator("#edit-connection").click()
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("Could not load")
+        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("OpenAI denied model-list access (403)")
         self.assertNotIn("SECRET PROVIDER DETAIL", await self.panel.locator("body").inner_text())
         await self.panel.locator("#api-model").click()
         await expect(self.panel.get_by_role("option", name="GPT-4.1 mini", exact=True)).to_be_visible()
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("Could not load")
+        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("OpenAI denied model-list access (403)")
         self.assertGreaterEqual(count, 2)
         current = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
         self.assertEqual(before, current)
@@ -132,3 +132,47 @@ class ModelDiscoveryTest(PanelTestCase):
             local: await chrome.storage.local.get(), session: await chrome.storage.session.get(),
         })""")
         self.assertNotIn("test-key", json.dumps(stores))
+
+    async def test_key_entry_loads_models_without_blur_and_refresh_bypasses_cache(self):
+        await self.panel.unroute("https://api.openai.com/v1/models")
+        requests = []
+
+        async def respond(route):
+            requests.append(route.request)
+            await route.fulfill(json={"data": [
+                {"id": "gpt-4.1-mini", "created": 1},
+                {"id": f"gpt-5-account-model-{len(requests)}", "created": 2},
+            ]})
+
+        await self.panel.route("https://api.openai.com/v1/models", respond)
+        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("Showing defaults")
+        await expect(self.panel.locator("#refresh-models")).to_be_disabled()
+        await self.panel.locator("#api-key").fill("automatic-discovery-test-key")
+        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("2 account models loaded")
+        await expect(self.panel.locator("#api-key")).to_be_focused()
+        await self.panel.locator("#api-model").click()
+        await expect(self.panel.get_by_role("option", name="gpt-5-account-model-1", exact=True)).to_be_visible()
+        self.assertEqual(len(requests), 1)
+        await self.panel.locator("#refresh-models").click()
+        await expect(self.panel.locator('#model-options [data-value="gpt-5-account-model-2"]')).to_have_count(1)
+        self.assertEqual(len(requests), 2)
+        await self.panel.locator("#api-key").fill("")
+        await expect(self.panel.locator("#refresh-models")).to_be_disabled()
+        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("Showing defaults")
+
+    async def test_saved_unverified_key_loads_models_on_startup(self):
+        await self.panel.evaluate("""() => chrome.storage.session.set({apiKey: 'startup-test-key'})""")
+        await self.panel.unroute("https://api.openai.com/v1/models")
+        requests = []
+
+        async def respond(route):
+            requests.append(route.request)
+            await route.fulfill(json={"data": [{"id": "gpt-5-startup-model", "created": 2}]})
+
+        await self.panel.route("https://api.openai.com/v1/models", respond)
+        await self.panel.reload()
+        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("1 account models loaded")
+        self.assertEqual(requests[0].headers["authorization"], "Bearer startup-test-key")
+        await self.panel.locator("#api-model").click()
+        await expect(self.panel.get_by_role("option", name="gpt-5-startup-model", exact=True)).to_be_visible()
+        await expect(self.panel.locator("#organize")).to_be_disabled()

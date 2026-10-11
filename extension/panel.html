@@ -32,7 +32,10 @@
               </svg>
             </button></div>
           <p class="note">Requires OpenAI API billing.</p>
-          <label id="model-label" for="api-model">Model</label>
+          <div class="label-row">
+            <label id="model-label" for="api-model">Model</label>
+            <button id="refresh-models" class="text-button" type="button" disabled>Refresh models</button>
+          </div>
           <div id="model-picker" class="model-picker">
             <button id="api-model" class="model-trigger" type="button" aria-haspopup="listbox"
               aria-expanded="false" aria-controls="model-options" aria-labelledby="model-label selected-model">
@@ -44,7 +47,7 @@
             <div id="model-options" class="model-options" role="listbox" aria-labelledby="model-label" hidden></div>
           </div>
           <p id="model-discovery-status" class="note model-discovery-status" role="status" aria-live="polite">
-            Enter your key to load available models.
+            Showing defaults. Enter your API key to load account models.
           </p>
           <p id="model-note" class="note">Fast and affordable for grouping tabs.</p>
           <details id="advanced"><summary>Advanced options</summary>

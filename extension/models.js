@@ -1,3 +1,5 @@
+export class ModelListError extends Error {}
+
 function isTextModel(id) {
   const base = id.startsWith("ft:") ? id.split(":")[1] : id;
   // The models endpoint has no capability metadata. Exclude known incompatible families;
@@ -21,7 +23,15 @@ export async function fetchModels(apiKey, signal) {
     credentials: "omit",
   });
   // Never expose provider error bodies, which can contain sensitive data.
-  if (!response.ok) throw new Error("Could not load available models.");
+  if (!response.ok) {
+    const messages = {
+      401: "OpenAI rejected the key (401). Edit your key and refresh.",
+      403: "OpenAI denied model-list access (403). Check the key’s Models read permission and project access.",
+      429: "OpenAI rate-limited model lookup (429). Try refreshing shortly.",
+    };
+    throw new ModelListError(messages[response.status] ||
+      `OpenAI could not list models (HTTP ${response.status}). Try refreshing.`);
+  }
   const result = await response.json();
   if (!Array.isArray(result?.data)) throw new Error("Invalid model list.");
   const unique = new Map();
