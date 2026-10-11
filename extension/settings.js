@@ -77,6 +77,8 @@ export async function mountSettings(root, testConnection) {
 
   function preserveSelection() {
     if (!availableModels.some(item => item.id === model.value)) {
+      // Keep an existing selection visible without growing the menu past fifteen choices.
+      availableModels = availableModels.slice(0, 14);
       availableModels.push({
         id: model.value, name: SUPPORTED_MODELS.find(item => item.id === model.value)?.name || model.value,
         note: "Not listed for this key. Test the connection to check access.",

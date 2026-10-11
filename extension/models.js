@@ -2,22 +2,6 @@ import {SUPPORTED_MODELS} from "./model-catalog.js";
 
 export class ModelListError extends Error {}
 
-function isTextModel(id) {
-  const base = id.startsWith("ft:") ? id.split(":")[1] : id;
-  if (SUPPORTED_MODELS.some(model => model.id === base)) return true;
-  // The models endpoint has no capability metadata. Exclude known incompatible families;
-  // the synthetic connection test determines whether a candidate supports our schema.
-  const incompatible = /audio|realtime|transcrib|tts|image|search|instruct|embedding|moderation|computer-use|oss/i;
-  if (incompatible.test(base)) {
-    return false;
-  }
-  if (/^o\d+(?:-|$)/.test(base)) return !/^o1-(mini|preview)/.test(base);
-  if (/^gpt-4o(?:-|$)/.test(base)) return !base.startsWith("gpt-4o-2024-05");
-  const version = /^gpt-(\d+)(?:\.(\d+))?(?:-|$)/.exec(base);
-  return Boolean(version && (Number(version[1]) >= 5 ||
-    (Number(version[1]) === 4 && Number(version[2]) >= 1)));
-}
-
 export async function fetchModels(apiKey, signal) {
   const response = await fetch("https://api.openai.com/v1/models", {
     headers: {Authorization: `Bearer ${apiKey}`},
@@ -39,7 +23,8 @@ export async function fetchModels(apiKey, signal) {
   if (!Array.isArray(result?.data)) throw new Error("Invalid model list.");
   const unique = new Map();
   for (const item of result.data) {
-    if (typeof item?.id !== "string" || !/^[a-zA-Z0-9._:-]{1,100}$/.test(item.id) || !isTextModel(item.id)) continue;
+    // Account discovery narrows the shortlist rather than restoring snapshots and older models.
+    if (!SUPPORTED_MODELS.some(model => model.id === item?.id)) continue;
     if (item.shutdown_date && Date.parse(item.shutdown_date) <= Date.now()) continue;
     unique.set(item.id, {
       id: item.id,
