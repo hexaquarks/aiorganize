@@ -32,8 +32,17 @@
               </svg>
             </button></div>
           <p class="note">Requires OpenAI API billing.</p>
-          <label for="api-model">Model</label>
-          <select id="api-model"></select>
+          <label id="model-label" for="api-model">Model</label>
+          <div id="model-picker" class="model-picker">
+            <button id="api-model" class="model-trigger" type="button" aria-haspopup="listbox"
+              aria-expanded="false" aria-controls="model-options" aria-labelledby="model-label selected-model">
+              <span id="selected-model">GPT-4.1 mini</span>
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                <path d="m3 6 5 5 5-5"/>
+              </svg>
+            </button>
+            <div id="model-options" class="model-options" role="listbox" aria-labelledby="model-label" hidden></div>
+          </div>
           <p id="model-note" class="note">Fast and affordable for grouping tabs.</p>
           <details id="advanced"><summary>Advanced options</summary>
             <label for="custom-model">Custom model ID</label>

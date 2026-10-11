@@ -1,3 +1,5 @@
+import {mountModelPicker} from "./model-picker.js";
+
 export const DEFAULT_MODEL = "gpt-4.1-mini";
 // Keep the picker small; custom IDs still have to pass the same connection test.
 export const SUPPORTED_MODELS = [
@@ -57,9 +59,7 @@ export async function mountSettings(root, testConnection) {
   let editing = true;
   let testing = false;
 
-  for (const item of SUPPORTED_MODELS) {
-    model.add(new Option(item.name, item.id));
-  }
+  const modelPicker = mountModelPicker(root, SUPPORTED_MODELS);
 
   function selectedModel() {
     return custom.value.trim() || model.value;
@@ -81,6 +81,7 @@ export async function mountSettings(root, testConnection) {
     root.querySelector("#cancel-settings").disabled = testing;
     form.setAttribute("aria-busy", String(testing));
     model.disabled = Boolean(custom.value.trim());
+    if (testing || model.disabled) modelPicker.close();
     submit.disabled = testing || !key.value.trim() || !selectedModel();
     root.querySelector("#model-note").textContent = custom.value.trim() ?
       "Custom models must support structured outputs." : SUPPORTED_MODELS.find(item => item.id === model.value).note;
@@ -91,7 +92,8 @@ export async function mountSettings(root, testConnection) {
     key.value = saved.apiKey;
     key.type = "password";
     root.querySelector("#reveal-key").setAttribute("aria-label", "Show API key");
-    model.value = SUPPORTED_MODELS.some(item => item.id === saved.model) ? saved.model : DEFAULT_MODEL;
+    const modelId = SUPPORTED_MODELS.some(item => item.id === saved.model) ? saved.model : DEFAULT_MODEL;
+    modelPicker.setValue(modelId);
     custom.value = model.value === saved.model ? "" : saved.model;
     root.querySelector("#advanced").open = Boolean(custom.value);
     remember.checked = Boolean(saved.remember);
