@@ -51,7 +51,7 @@
           </p>
           <p id="model-note" class="note">Supports tab grouping. Test the connection to verify access with your key.</p>
           <label class="remember"><input id="remember-key" type="checkbox"><span>Remember key on this device
-            <small>Otherwise, cleared when Chrome restarts.<br>Saved locally, never synced.</small></span></label>
+            <small>Unchecked: kept until Chrome fully quits.<br>Closing this panel keeps the key. Never synced.</small></span></label>
         </fieldset>
         <button id="test-connection" class="primary" type="submit" disabled>
           <span class="spinner" aria-hidden="true"></span><span id="test-label">Test &amp; save connection</span>
@@ -67,8 +67,6 @@
         </div>
         <time id="verified-time"></time>
         <div class="card organize-card">
-          <label for="window-scope">Organize tabs in</label>
-          <select id="window-scope"><option>Current window</option></select>
           <div class="illustration" aria-hidden="true">
             <div class="sample work"><span>Work</span><i></i><i></i></div>
             <div class="sample research"><span>Research</span><i></i><i></i></div>
@@ -84,10 +82,6 @@
           <path d="m12 2 9 4v6c0 5-9 10-9 10S3 17 3 12V6Z"/><path d="m8 12 3 3 5-6"/>
         </svg><span>Organizing sends tab titles and URLs to OpenAI.<br>Your data is only used to group your tabs.</span></p>
       <div id="connection-actions" hidden>
-        <button id="manage-connection" class="text-button" type="button"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
-              <path d="m9 3-.6 2.3-2 .9L4 5.6 2 9l1.8 1.6v2.8L2 15l2 3.4 2.4-.6 2 .9L9 21h6l.6-2.3 2-.9 2.4.6 2-3.4-1.8-1.6v-2.8L22 9l-2-3.4-2.4.6-2-.9L15 3Z"/>
-              <circle cx="12" cy="12" r="3"/>
-            </svg> Manage connection</button>
         <button id="forget-key" class="text-button muted" type="button"><svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
             <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>
           </svg> Remove key</button>

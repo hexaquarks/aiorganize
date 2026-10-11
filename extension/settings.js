@@ -216,7 +216,7 @@ export async function mountSettings(root, testConnection) {
     key.type = key.type === "password" ? "text" : "password";
     event.currentTarget.setAttribute("aria-label", key.type === "password" ? "Show API key" : "Hide API key");
   });
-  for (const id of ["settings-toggle", "edit-connection", "manage-connection"]) {
+  for (const id of ["settings-toggle", "edit-connection"]) {
     root.querySelector(`#${id}`).addEventListener("click", openEditor);
   }
   root.querySelector("#cancel-settings").addEventListener("click", showSaved);

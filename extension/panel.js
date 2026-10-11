@@ -1,6 +1,6 @@
 import {validateProposal} from "./proposal.js";
 import {requestProposal, testConnection} from "./llm.js";
-import {getTabState, applyGroups} from "./tabs.js";
+import {getTabState, applyGroups, groupColor} from "./tabs.js";
 import {mountSettings} from "./settings.js";
 
 function siteLabel(url) {
@@ -16,12 +16,12 @@ function renderGroups(root, groups, snapshot) {
   const byId = new Map(snapshot.map(tab => [tab.id, tab]));
   const container = root.querySelector("#groups");
   container.replaceChildren();
-  const colors = ["#8b9cfb", "#64c6a7", "#e4b868", "#cb91dc", "#6bbecf", "#e58f9f"];
   for (const [index, group] of groups.entries()) {
     const card = document.createElement("article");
     card.className = "group";
-    const color = group.name.toLowerCase() === "other" ? "#929aab" : colors[index % colors.length];
-    card.style.setProperty("--group-color", color);
+    const color = groupColor(group.name, index);
+    card.style.setProperty("--group-color", color.hex);
+    card.dataset.color = color.name;
     const header = document.createElement("div");
     header.className = "group-header";
     const heading = document.createElement("h3");
@@ -68,10 +68,17 @@ export function mountPanel(root, propose = requestProposal) {
   let busy = false;
   let tabCount = 0;
 
+  function reveal(element) {
+    element.scrollIntoView({
+      block: "start",
+      behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
+    });
+  }
+
   function updateOrganize() {
     organize.disabled = busy || root.querySelector("main").dataset.connected !== "true";
     root.querySelector("#organize-label").textContent = busy ? "Working…" :
-      (tabCount ? `Organize ${tabCount} tabs` : "Organize tabs");
+      (tabCount ? `Organize ${tabCount} ${tabCount === 1 ? "tab" : "tabs"}` : "Organize tabs");
   }
 
   async function refreshCount() {
@@ -104,7 +111,6 @@ export function mountPanel(root, propose = requestProposal) {
     busy = value;
     updateOrganize();
     root.querySelector("#settings-toggle").disabled = busy;
-    root.querySelector("#manage-connection").disabled = busy;
     root.querySelector("#forget-key").disabled = busy;
     root.querySelector("#edit-connection").disabled = busy;
     approve.disabled = busy || pending === null;
@@ -120,6 +126,7 @@ export function mountPanel(root, propose = requestProposal) {
     clearPreview();
     setBusy(true);
     status.textContent = "Reading this window’s tabs…";
+    reveal(status);
     try {
       // Bind to the panel's own window, even if focus moves while generating a proposal.
       const window = await chrome.windows.getCurrent();
@@ -144,8 +151,12 @@ export function mountPanel(root, propose = requestProposal) {
       root.querySelector("#summary").textContent = `${snapshot.length} tabs in ${groups.length} groups.`;
       preview.hidden = false;
       status.textContent = "Review the groups below. Your tabs haven’t changed.";
+      reveal(preview);
     } catch (error) {
-      if (!listeners.signal.aborted) status.textContent = error.message;
+      if (!listeners.signal.aborted) {
+        status.textContent = error.message;
+        reveal(status);
+      }
     } finally {
       if (!listeners.signal.aborted) setBusy(false);
     }
@@ -154,6 +165,7 @@ export function mountPanel(root, propose = requestProposal) {
   reject.addEventListener("click", () => {
     clearPreview();
     status.textContent = "Proposal rejected. Your tabs haven’t changed.";
+    reveal(status);
   }, {signal: listeners.signal});
 
   approve.addEventListener("click", async () => {
@@ -169,6 +181,7 @@ export function mountPanel(root, propose = requestProposal) {
       clearPreview();
       status.textContent = error.message;
     } finally {
+      reveal(status);
       setBusy(false);
     }
   }, {signal: listeners.signal});

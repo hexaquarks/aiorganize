@@ -2,10 +2,56 @@ import json
 
 from playwright.async_api import expect
 
+from src.dev import CHROME_ARGS
+
 from tests.integration.test_panel import PanelTestCase
 
 
 class ConnectionSetupTest(PanelTestCase):
+    async def reopen_browser(self):
+        url = self.panel.url
+        await self.context.close()
+        self.context = await self.playwright.chromium.launch_persistent_context(
+            self.profile.name, channel="chrome", headless=True, args=CHROME_ARGS,
+            ignore_default_args=["--disable-extensions"],
+        )
+        self.addAsyncCleanup(self.context.close)
+        self.panel = await self.context.new_page()
+        await self.panel.route("https://api.openai.com/v1/models", lambda route: route.fulfill(json={
+            "data": [{"id": "gpt-6.1-sol", "created": 1}],
+        }))
+        await self.panel.goto(url)
+
+    async def test_session_key_survives_panel_close_but_not_browser_restart(self):
+        await self.connect(remember=False)
+        url = self.panel.url
+        await self.panel.close()
+        self.panel = await self.context.new_page()
+        await self.panel.goto(url)
+        await expect(self.panel.locator("#ready")).to_be_visible()
+        await expect(self.panel.locator("#connection-detail")).to_contain_text("Session only")
+        await self.reopen_browser()
+        await expect(self.panel.locator("#api-settings")).to_be_visible()
+        await expect(self.panel.locator("#api-key")).to_be_empty()
+        await expect(self.panel.locator("#remember-key")).not_to_be_checked()
+        await expect(self.panel.locator("#organize")).to_be_disabled()
+        stores = await self.panel.evaluate("""async () => ({
+            local: await chrome.storage.local.get(), session: await chrome.storage.session.get(),
+        })""")
+        self.assertNotIn("test-secret", json.dumps(stores))
+
+    async def test_remembered_key_survives_browser_restart(self):
+        await self.connect(remember=True)
+        await self.reopen_browser()
+        await expect(self.panel.locator("#ready")).to_be_visible()
+        await expect(self.panel.locator("#connection-detail")).to_contain_text("Remembered on this device")
+        await expect(self.panel.locator("#organize")).to_be_enabled()
+        stores = await self.panel.evaluate("""async () => ({
+            local: await chrome.storage.local.get(), session: await chrome.storage.session.get(),
+        })""")
+        self.assertEqual(stores["local"]["connection"]["apiKey"], "test-secret")
+        self.assertNotIn("connection", stores["session"])
+
     async def test_old_unverified_settings_use_the_new_default(self):
         old_settings = [
             {"model": "gpt-4o-mini"},

@@ -31,4 +31,3 @@ export function validateProposal(proposal, snapshot) {
     Number(a.name.trim().toLowerCase() === "other") - Number(b.name.trim().toLowerCase() === "other")
   );
 }
-

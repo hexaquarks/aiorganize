@@ -118,7 +118,7 @@ a {
   font-weight: 500;
 }
 
-input:not([type="checkbox"]), select {
+input:not([type="checkbox"]) {
   width: 100%;
   height: 42px;
   border: 1px solid var(--border);
@@ -473,15 +473,9 @@ main[data-connected="true"] .privacy-note {
 
 #connection-actions {
   display: flex;
-  justify-content: space-around;
+  justify-content: flex-end;
   gap: 8px;
   margin: 22px 0 0;
-}
-
-#connection-actions button + button {
-  border-left: 1px solid var(--border);
-  border-radius: 0;
-  padding-left: 20px;
 }
 
 .status-line {
@@ -569,6 +563,7 @@ h2 {
 .group {
   margin-bottom: 10px;
   border: 1px solid var(--border);
+  border-left: 6px solid var(--group-color);
   border-radius: 13px;
   background: var(--surface);
   overflow: hidden;
@@ -579,7 +574,9 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px 13px 9px;
+  padding: 13px;
+  margin-bottom: 6px;
+  background: color-mix(in srgb, var(--group-color) 18%, white);
 }
 
 h3 {
@@ -591,17 +588,12 @@ h3 {
   font-weight: 650;
 }
 
-h3::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--group-color);
-}
-
 .group-count {
-  color: var(--muted);
+  color: var(--text);
   font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #ffffffb0;
 }
 
 ul {
@@ -793,4 +785,8 @@ li:hover {
 .model-discovery-status {
   margin-bottom: 4px;
   font-size: 12px;
+}
+
+#preview, #status {
+  scroll-margin-top: 16px;
 }

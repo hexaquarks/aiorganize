@@ -93,6 +93,35 @@ class ExtensionPanelTest(PanelTestCase):
         await expect(self.panel.locator("#approve")).to_be_disabled()
         await self.assert_no_groups()
 
+    async def test_results_scroll_into_view_and_group_colors_are_prominent(self):
+        await self.panel.set_viewport_size({"width": 420, "height": 480})
+        await self.install_proposal_fixture()
+        await expect(self.panel.locator("#window-scope")).to_have_count(0)
+        await expect(self.panel.locator("#manage-connection")).to_have_count(0)
+        await self.organize()
+        await expect(self.panel.locator("#preview-heading")).to_be_in_viewport()
+        await self.panel.wait_for_function("() => document.querySelector('#preview').getBoundingClientRect().top <= 20")
+        self.assertGreater(await self.panel.evaluate("scrollY"), 0)
+        cards = await self.panel.locator(".group").evaluate_all("""elements => elements.map(element => ({
+            color: element.dataset.color,
+            border: getComputedStyle(element).borderLeftWidth,
+            header: getComputedStyle(element.querySelector('.group-header')).backgroundColor,
+        }))""")
+        self.assertEqual([card["color"] for card in cards], ["blue", "grey"])
+        self.assertTrue(all(card["border"] == "6px" for card in cards))
+        self.assertNotEqual(cards[0]["header"], cards[1]["header"])
+        self.assertTrue(all(card["header"] not in ["rgba(0, 0, 0, 0)", "rgb(255, 255, 255)"] for card in cards))
+        await self.panel.screenshot(path="dist/group-colors-preview.png")
+        await self.assert_no_groups()
+
+    async def test_organization_error_scrolls_into_view(self):
+        await self.panel.set_viewport_size({"width": 420, "height": 400})
+        await self.install_proposal_fixture(invalid=True)
+        await self.panel.locator("#organize").click()
+        await expect(self.panel.locator("#status")).to_contain_text("duplicate")
+        await expect(self.panel.locator("#status")).to_be_in_viewport()
+        await self.assert_no_groups()
+
     async def test_preview_rejection_and_explicit_approval(self):
         await self.install_proposal_fixture()
         await self.organize()
