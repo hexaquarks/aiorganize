@@ -8,6 +8,8 @@ from demos.fixtures import EXTENSION_PATH, create_test_tabs
 
 
 class PanelTestCase(unittest.IsolatedAsyncioTestCase):
+    extension_path = EXTENSION_PATH
+
     async def asyncSetUp(self):
         self.profile = tempfile.TemporaryDirectory(prefix="aiorganize-panel-test-")
         self.addCleanup(self.profile.cleanup)
@@ -21,7 +23,7 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
             ignore_default_args=["--disable-extensions"],
         )
         self.addAsyncCleanup(self.context.close)
-        self.worker = await load_group_extension(self.context, EXTENSION_PATH)
+        self.worker = await load_group_extension(self.context, self.extension_path)
         await create_test_tabs(self.context)
         self.panel = await self.context.new_page()
         await self.panel.goto(self.worker.url.removesuffix("background.js") + "panel.html")
@@ -52,7 +54,7 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
         await expect(self.panel.locator("#preview")).to_be_visible()
 
     async def assert_no_groups(self):
-        state = await self.worker.evaluate("() => tabGroupState()")
+        state = await self.worker.evaluate("() => tabGroupState(true)")
         self.assertEqual(state["groups"], [])
         self.assertTrue(all(tab["group_id"] == -1 for tab in state["tabs"]))
 

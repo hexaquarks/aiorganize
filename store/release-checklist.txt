@@ -1,0 +1,92 @@
+Local preparation
+
+Run uv sync and make test. Run make package-extension for a working-tree preview in dist/.
+The ZIP uses a fixed allowlist and stable ZIP metadata, omits the terminal demo control page and
+debugger permission, and includes no companion, API key, tests, or store submission material.
+Regenerate artwork and the sample panel screenshot with uv run python -m demos.store_assets.
+The screenshot uses offline fixtures; it is not evidence of a live model or Web Store installation.
+
+Release versioning
+
+Set extension/manifest.json version to a greater Chrome version before each update. Use a matching
+v<version> Git tag on the reviewed release commit. Tags are the extension's release history; fetch
+the full history and tags before release checks. Versions have 1–4 numeric parts, each 0–65535,
+no leading zeros, and cannot be all zero. Missing components compare as zero.
+After the release tag exists, run:
+  uv run python -m aiorganize.package_extension --tag v0.1.0
+The builder reads only the tag's committed files, checks ancestor release versions, and emits a ZIP
+and SHA-256 sidecar in dist/. It does not create tags, push, upload, or publish.
+If the latest store version has no ancestor tag, also pass --previous-version <latest-store-version>.
+Always compare with the actual dashboard version; local tags alone cannot prove the store's state.
+Rebuilding a tag uses its ancestor history so later releases do not prevent reproducing older ZIPs.
+
+Store preparation — publishing requires separate explicit authorization
+
+Use store/listing.json for listing and privacy fields. Review the sensitive-data categories against
+the current dashboard. Complete the developer contact, effective date, and hosted privacy-policy URL
+from store/privacy.html. Upload the icon, 440x280 promo image, and 1280x800 screenshot separately.
+Supply review instructions for the companion: Python 3.11+, uv sync, OPENAI_API_KEY in the local
+environment or .env, and access to the model configured in src/aiorganize/agent.py. Do not put a key
+in the ZIP, repository, listing, or reviewer notes. The current installer supports macOS/Linux only.
+
+When authorized to upload, record the store-assigned extension ID. After installing that item, run:
+  uv run python -m aiorganize.install_companion --extension-id <store-extension-id>
+An unpacked extension's ID may differ. Registration replaces the companion's allowed origin with
+the installed ID. The extension requires the companion and the project directory to remain available.
+
+Owner-only distribution
+
+In publisher account settings, verify the trusted tester list contains only the owner's Google account.
+That list is publisher-wide: if other items need additional testers, resolve the account choice first;
+do not silently remove their access. In this item's Distribution tab choose Private and only trusted
+testers from publisher settings. Do not add Google Groups or domain-wide access. Never use Unlisted
+or Public. Record the selected settings before any separately authorized submission/publication.
+
+Pending verification after authorized private publication
+
+1. Sign into a clean Chrome profile as the owner. Install from the store listing, not Load unpacked.
+   Record date, listing URL, extension ID, version, and Private/owner-only distribution evidence.
+2. Register the companion for that ID. Confirm a missing companion reports an actionable error.
+   With the companion ready, generate a proposal on sample tabs, reject it, then generate and approve.
+   Confirm rejection changes no groups and approval groups only the selected window.
+3. In a signed-out profile and a non-tester account, confirm the listing cannot be installed.
+4. After a separately authorized higher-version release to the SAME private item, allow Chrome to
+   update (or use chrome://extensions > Developer mode > Update). Confirm the installed version rises,
+   the extension ID stays the same, the companion still works, and existing groups remain intact.
+5. Record actual results before closing issue #4. Local ZIP tests do not prove store access or updates.
+
+Automating updates after the initial private publication
+
+Register the developer account, enable 2-step verification, create the item, fill listing/privacy
+fields, and publish it privately once in the dashboard. Google's API does not configure the tester
+list or listing fields, and a changed visibility must be published manually once before API use.
+Enable Chrome Web Store API in a Google Cloud project and obtain an OAuth refresh token using the
+chromewebstore scope and the Google account that owns the item. Follow Google's API guide below.
+
+Keep these values in the ignored local .env (or environment), never in the release ZIP or Git:
+  CWS_PUBLISHER_ID
+  CWS_EXTENSION_ID
+  CWS_CLIENT_ID
+  CWS_CLIENT_SECRET
+  CWS_REFRESH_TOKEN
+
+Read status with make store-status. For each reviewed, tagged version, upload with:
+  uv run --env-file .env python -m aiorganize.webstore release --tag v0.2.0
+The command builds committed tag files, compares versions against the store and ancestor tags,
+and waits for upload processing. Upload alone does not submit for review or publish.
+
+When publishing is authorized, check that the dashboard's trusted tester list still contains ONLY
+the owner's account, then upload and submit the private update with:
+  uv run --env-file .env python -m aiorganize.webstore release --tag v0.2.0 --publish-private --confirm-owner-only
+This requires the existing item to be PUBLISHED_TO_TESTERS. It retains existing visibility, requests
+normal review, and blocks on Google warnings. The API does not expose tester identities; the flag
+confirms your dashboard check. Google controls review timing. The command does not push or create tags.
+
+Sources
+https://developer.chrome.com/docs/extensions/reference/manifest/version
+https://developer.chrome.com/docs/webstore/images
+https://developer.chrome.com/docs/webstore/cws-dashboard-privacy
+https://developer.chrome.com/docs/webstore/cws-dashboard-distribution
+https://developer.chrome.com/docs/webstore/using-api
+https://developer.chrome.com/docs/webstore/api/reference/rest/v2/media/upload
+https://developer.chrome.com/docs/webstore/api/reference/rest/v2/publishers.items/publish
