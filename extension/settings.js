@@ -54,7 +54,6 @@ export async function mountSettings(root, testConnection) {
   const form = root.querySelector("#api-settings");
   const key = root.querySelector("#api-key");
   const model = root.querySelector("#api-model");
-  const custom = root.querySelector("#custom-model");
   const remember = root.querySelector("#remember-key");
   const submit = root.querySelector("#test-connection");
   const feedback = root.querySelector("#settings-status");
@@ -115,12 +114,12 @@ export async function mountSettings(root, testConnection) {
       loadedAt = Date.now();
       modelStatus.textContent = items.length ?
         `${items.length} account models loaded · default first, then newest.` :
-        "No text models found. You can still test a custom model ID.";
+        "No supported models found for this key. Check project access or refresh.";
       update();
     } catch (error) {
       if (!controller.signal.aborted) {
         modelStatus.textContent = error instanceof ModelListError ? error.message :
-          "Could not reach the model list. Check your connection and refresh, or use a custom ID.";
+          "Could not reach the model list. Check your connection and refresh.";
       }
     } finally {
       if (discovery === controller) discovery = null;
@@ -129,7 +128,7 @@ export async function mountSettings(root, testConnection) {
   }
 
   function selectedModel() {
-    return custom.value.trim() || model.value;
+    return model.value;
   }
 
   function update() {
@@ -148,12 +147,10 @@ export async function mountSettings(root, testConnection) {
     root.querySelector("#cancel-settings").disabled = testing;
     form.setAttribute("aria-busy", String(testing));
     refreshButton.disabled = testing || Boolean(discovery) || !key.value.trim();
-    model.disabled = Boolean(custom.value.trim());
-    if (testing || model.disabled) modelPicker.close();
+    if (testing) modelPicker.close();
     submit.disabled = testing || !key.value.trim() || !selectedModel();
     const modelNote = availableModels.find(item => item.id === model.value)?.note;
-    root.querySelector("#model-note").textContent = custom.value.trim() ?
-      "Custom models must support structured outputs." : (modelNote || "Test to verify model compatibility.");
+    root.querySelector("#model-note").textContent = modelNote || "Test to verify model compatibility.";
     root.dispatchEvent(new Event("connectionchange"));
   }
 
@@ -161,10 +158,8 @@ export async function mountSettings(root, testConnection) {
     key.value = saved.apiKey;
     key.type = "password";
     root.querySelector("#reveal-key").setAttribute("aria-label", "Show API key");
-    const modelId = availableModels.some(item => item.id === saved.model) ? saved.model : DEFAULT_MODEL;
-    modelPicker.setValue(modelId);
-    custom.value = model.value === saved.model ? "" : saved.model;
-    root.querySelector("#advanced").open = Boolean(custom.value);
+    modelPicker.setValue(saved.model || DEFAULT_MODEL);
+    preserveSelection();
     remember.checked = Boolean(saved.remember);
     feedback.hidden = true;
   }
@@ -207,7 +202,7 @@ export async function mountSettings(root, testConnection) {
     update();
   }
 
-  for (const field of [key, model, custom, remember]) {
+  for (const field of [key, model, remember]) {
     field.addEventListener("input", () => { feedback.hidden = true; update(); });
   }
   key.addEventListener("input", () => {

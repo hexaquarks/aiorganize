@@ -21,7 +21,8 @@ class ConnectionSetupTest(PanelTestCase):
                 }""", local_settings)
                 await self.panel.reload()
                 await expect(self.panel.locator("#api-model")).to_contain_text("GPT-6.1 Sol")
-                await expect(self.panel.locator("#custom-model")).to_be_empty()
+                await expect(self.panel.locator("#custom-model")).to_have_count(0)
+                await expect(self.panel.locator("#advanced")).to_have_count(0)
                 await expect(self.panel.locator("#api-model")).to_be_enabled()
                 await expect(self.panel.locator("#organize")).to_be_disabled()
                 settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
@@ -134,8 +135,6 @@ class ConnectionSetupTest(PanelTestCase):
 
         await self.panel.route("https://api.openai.com/v1/responses", respond)
         await self.panel.locator("#api-key").fill("test-secret")
-        await self.panel.locator("#advanced").click()
-        await self.panel.locator("#custom-model").fill("custom-model")
         await self.panel.locator("#test-connection").click()
         await expect(self.panel.locator("#test-connection")).to_be_disabled()
         await expect(self.panel.locator("#api-key")).to_be_disabled()
@@ -159,7 +158,7 @@ class ConnectionSetupTest(PanelTestCase):
         await expect(self.panel.locator("#settings-status")).to_contain_text("Could not connect")
         await expect(self.panel.locator("#organize")).to_be_disabled()
 
-    async def test_model_change_requires_validation_and_custom_model_is_used(self):
+    async def test_model_change_requires_validation_and_selected_model_is_used(self):
         await self.connect()
         before = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
         await self.panel.locator("#edit-connection").click()
@@ -168,13 +167,11 @@ class ConnectionSetupTest(PanelTestCase):
         await expect(self.panel.locator("#organize")).to_be_disabled()
         current = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
         self.assertEqual(before, current)
-        await self.panel.locator("#advanced summary").click()
-        await self.panel.locator("#custom-model").fill("gpt-4.1-mini-2025-04-14")
         await self.panel.locator("#test-connection").click()
         await expect(self.panel.locator("#ready")).to_be_visible()
         settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
-        self.assertEqual(settings["model"], "gpt-4.1-mini-2025-04-14")
-        await expect(self.panel.locator("#connection-detail")).to_contain_text(settings["model"])
+        self.assertEqual(settings["model"], "gpt-5.5")
+        await expect(self.panel.locator("#connection-detail")).to_contain_text("GPT-5.5")
 
     async def test_model_menu_stays_aligned_and_supports_keyboard_navigation(self):
         await self.panel.set_viewport_size({"width": 462, "height": 800})
