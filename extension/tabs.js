@@ -1,3 +1,20 @@
+const GROUP_COLORS = [
+  {name: "blue", hex: "#1a73e8"},
+  {name: "green", hex: "#188038"},
+  {name: "yellow", hex: "#f9ab00"},
+  {name: "purple", hex: "#a142f4"},
+  {name: "cyan", hex: "#007b83"},
+  {name: "orange", hex: "#e8710a"},
+  {name: "pink", hex: "#d01884"},
+  {name: "red", hex: "#d93025"},
+];
+
+// Share the palette so preview colors describe the groups Chrome will actually apply.
+export function groupColor(name, index) {
+  return name.toLowerCase() === "other" ? {name: "grey", hex: "#737b89"} :
+    GROUP_COLORS[index % GROUP_COLORS.length];
+}
+
 export async function getTabState() {
   const tabs = (await chrome.tabs.query({})).filter(tab =>
     !tab.url?.startsWith(chrome.runtime.getURL(""))
@@ -54,7 +71,6 @@ export async function applyGroups({groups, snapshot, window_id}) {
     throw new Error("Tabs were added after preview. Generate and review a new proposal.");
   }
 
-  const colors = ["blue", "green", "yellow", "purple", "cyan", "orange", "pink", "red"];
   const applied = [];
   let otherGroupId;
   try {
@@ -64,7 +80,7 @@ export async function applyGroups({groups, snapshot, window_id}) {
       applied.push(group.name);
       await chrome.tabGroups.update(groupId, {
         title: group.name,
-        color: group.name.toLowerCase() === "other" ? "grey" : colors[index % colors.length],
+        color: groupColor(group.name, index).name,
         collapsed: false,
       });
       if (group.name.toLowerCase() === "other") {

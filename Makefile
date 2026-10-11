@@ -1,7 +1,10 @@
-.PHONY: dev build test store-status
+.PHONY: dev dev-isolated build test store-status
 
 dev:
 	uv run python -m src.dev
+
+dev-isolated:
+	uv run python -m src.dev --isolated
 
 build:
 	uv run python -m src.build --preview

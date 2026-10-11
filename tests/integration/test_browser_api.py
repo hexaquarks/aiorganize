@@ -18,11 +18,8 @@ class BrowserApiTest(PanelTestCase):
         self.requests = []
 
     async def save_key(self, *, remember=False):
-        await self.panel.locator("#settings summary").click()
-        await self.panel.locator("#api-key").fill("test-key")
-        await self.panel.locator("#remember-key").set_checked(remember)
-        await self.panel.get_by_role("button", name="Save settings", exact=True).click()
-        await expect(self.panel.locator("#settings-status")).to_contain_text("Key saved")
+        await self.connect(remember=remember, api_key="test-key")
+        await self.panel.unroute("https://api.openai.com/v1/responses")
 
     async def install_api_fixture(self, *, status=200, invalid=False, delayed=False):
         self.request_started = asyncio.Event()
@@ -62,8 +59,11 @@ class BrowserApiTest(PanelTestCase):
         self.assertFalse((self.extension_path / "control.html").exists())
         self.assertFalse((self.extension_path / "companion-client.js").exists())
         self.assertFalse((self.extension_path / "page-reader.js").exists())
-        await self.panel.get_by_role("button", name="Organize tabs", exact=True).click()
-        await expect(self.panel.get_by_role("status")).to_contain_text("Add your OpenAI API key")
+        await expect(self.panel.locator("#organize")).to_be_disabled()
+        await self.panel.locator("#api-model").click()
+        await expect(self.panel.get_by_role("option")).to_have_count(15)
+        await expect(self.panel.get_by_role("option", name="GPT-6.1 Sol", exact=True)).to_have_count(1)
+        await self.panel.keyboard.press("Escape")
         await self.assert_no_groups()
 
     async def test_browser_request_uses_only_metadata_and_applies_only_after_approval(self):
@@ -72,7 +72,7 @@ class BrowserApiTest(PanelTestCase):
         await self.organize()
         request = self.requests[0]
         self.assertFalse(request["store"])
-        self.assertEqual(request["model"], "gpt-4.1-mini")
+        self.assertEqual(request["model"], "gpt-6.1-sol")
         self.assertEqual(request["text"]["format"]["type"], "json_schema")
         context = json.loads(request["input"])
         self.assertEqual(len(context["tabs"]), 6)
@@ -86,21 +86,21 @@ class BrowserApiTest(PanelTestCase):
         await self.assert_no_groups()
         await self.organize()
         await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
-        await expect(self.panel.get_by_role("status")).to_have_text("Your tabs are organized.")
+        await expect(self.panel.locator("#status")).to_have_text("Your tabs are organized.")
         state = await self.panel.evaluate("async () => (await import('./tabs.js')).getTabState()")
         self.assertEqual({group["name"] for group in state["groups"]}, {"Dev", "Other"})
 
     async def test_invalid_proposal_and_provider_error_are_safe(self):
         await self.save_key()
         await self.install_api_fixture(invalid=True)
-        await self.panel.get_by_role("button", name="Organize tabs", exact=True).click()
-        await expect(self.panel.get_by_role("status")).to_contain_text("duplicate")
+        await self.panel.locator("#organize").click()
+        await expect(self.panel.locator("#status")).to_contain_text("duplicate")
         await expect(self.panel.locator("#approve")).to_be_disabled()
         await self.assert_no_groups()
         await self.panel.unroute("https://api.openai.com/v1/responses")
         await self.install_api_fixture(status=401)
-        await self.panel.get_by_role("button", name="Organize tabs", exact=True).click()
-        await expect(self.panel.get_by_role("status")).to_contain_text("rejected the API key")
+        await self.panel.locator("#organize").click()
+        await expect(self.panel.locator("#status")).to_contain_text("Key rejected")
         self.assertNotIn("sensitive-provider-detail", await self.panel.locator("body").inner_text())
         await self.assert_no_groups()
 
@@ -112,19 +112,17 @@ class BrowserApiTest(PanelTestCase):
             session: await chrome.storage.session.get(null),
             sync: await chrome.storage.sync.get(null),
         })""")
-        self.assertNotIn("apiKey", stored["local"])
-        self.assertEqual(stored["session"]["apiKey"], "test-key")
+        self.assertNotIn("connection", stored["local"])
+        self.assertEqual(stored["session"]["connection"]["apiKey"], "test-key")
         self.assertEqual(stored["sync"], {})
-        await self.panel.locator("#remember-key").check()
-        await self.panel.get_by_role("button", name="Save settings", exact=True).click()
-        await expect(self.panel.locator("#settings-status")).to_have_text("Key saved on this device.")
+        await self.panel.locator("#edit-connection").click()
+        await self.save_key(remember=True)
         await self.panel.evaluate("() => chrome.storage.session.clear()")
         await self.panel.reload()
-        await self.panel.locator("#settings summary").click()
+        await expect(self.panel.locator("#ready")).to_be_visible()
+        await self.panel.locator("#edit-connection").click()
         await expect(self.panel.locator("#remember-key")).to_be_checked()
-        self.assertEqual(await self.panel.locator("#api-key").input_value(), "")
-        await self.panel.get_by_role("button", name="Forget key", exact=True).click()
-        await expect(self.panel.locator("#settings-status")).to_have_text("API key removed.")
+        await self.panel.locator("#forget-key").click()
         self.assertEqual(await self.panel.evaluate("""async () => {
             const {getSettings} = await import('./settings.js');
             return (await getSettings()).apiKey;
@@ -133,7 +131,7 @@ class BrowserApiTest(PanelTestCase):
     async def test_aborted_browser_request_does_not_create_a_preview(self):
         await self.save_key()
         await self.install_api_fixture(delayed=True)
-        await self.panel.get_by_role("button", name="Organize tabs", exact=True).click()
+        await self.panel.locator("#organize").click()
         await expect(self.panel.locator("#organize")).to_be_disabled()
         await asyncio.wait_for(self.request_started.wait(), timeout=10)
         await self.panel.evaluate("""async () => {

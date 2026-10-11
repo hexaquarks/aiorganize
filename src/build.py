@@ -15,8 +15,8 @@ PROJECT = Path(__file__).resolve().parents[1]
 # An explicit list prevents local configuration and development utilities entering releases.
 EXTENSION_FILES = (
     "background.js", "manifest.json", "panel.css", "panel.html",
-    "panel.js", "llm.js", "tabs.js", "icons/16.png", "icons/32.png", "icons/48.png", "icons/128.png",
-    "settings.js",
+    "panel.js", "llm.js", "tabs.js",
+    "settings.js", "model-picker.js", "models.js", "model-catalog.js", "proposal.js", "icons/brand.png",
 )
 
 
