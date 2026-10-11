@@ -30,6 +30,9 @@ class PackageExtensionTest(unittest.TestCase):
             manifest = json.loads(archive.read("manifest.json"))
             self.assertNotIn("debugger", manifest["permissions"])
             self.assertNotIn("nativeMessaging", manifest["permissions"])
+            self.assertNotIn("scripting", manifest["permissions"])
+            self.assertEqual(manifest["host_permissions"], ["https://api.openai.com/*"])
+            self.assertNotIn("page-reader.js", archive.namelist())
             self.assertNotIn(b"companion", archive.read("panel-entry.js"))
             self.assertEqual(manifest["version"], "0.1.0")
             for icon in manifest["icons"].values():

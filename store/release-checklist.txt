@@ -2,7 +2,8 @@ Local preparation
 
 Run uv sync and make test. Run make package-extension for a working-tree preview in dist/.
 The ZIP uses a fixed allowlist and stable ZIP metadata, omits the terminal demo control page and
-debugger permission, and includes no companion, API key, tests, or store submission material.
+debugger, nativeMessaging, and scripting permissions. It includes no companion, page reader,
+API key, tests, or store submission material. Host access is limited to the model API.
 Regenerate artwork and the sample panel screenshot with uv run python -m demos.store_assets.
 The screenshot uses offline fixtures; it is not evidence of a live model or Web Store installation.
 
@@ -23,8 +24,7 @@ Rebuilding a tag uses its ancestor history so later releases do not prevent repr
 Store preparation — publishing requires separate explicit authorization
 
 Use store/listing.json for listing and privacy fields. Review the sensitive-data categories against
-the current dashboard. Complete the developer contact, effective date, and hosted privacy-policy URL
-from store/privacy.html. Upload the icon, 440x280 promo image, and 1280x800 screenshot separately.
+the current dashboard. Host store/privacy.html and enter its public URL in the dashboard. Upload the icon, 440x280 promo image, and 1280x800 screenshot separately.
 Review instructions: install the extension, open API settings, enter an OpenAI API key, and select
 a model the account can use. Generate, reject, and approve proposals on sample tabs. The release
 needs no Python, companion, terminal, or checkout. Never include credentials in the ZIP or listing.

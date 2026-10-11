@@ -16,7 +16,7 @@ PROJECT = Path(__file__).resolve().parents[2]
 EXTENSION_FILES = (
     "background.js", "manifest.json", "panel-entry.js", "panel.css", "panel.html",
     "panel.js", "proposal-client.js", "icons/16.png", "icons/32.png", "icons/48.png", "icons/128.png",
-    "page-reader.js", "settings.js",
+    "settings.js",
 )
 
 
@@ -39,10 +39,12 @@ def build_zip(files: dict[str, bytes], tag: str, previous_versions: list[str]) -
     if any(current <= chrome_version(previous) for previous in previous_versions):
         raise ValueError("The release version must be greater than every previous release version.")
 
-    # Native messaging and debugger access belong only to the unpacked development build.
+    # Companion and page-reading permissions belong only to the unpacked development build.
     manifest["permissions"] = [
-        permission for permission in manifest["permissions"] if permission not in {"debugger", "nativeMessaging"}
+        permission for permission in manifest["permissions"]
+        if permission not in {"debugger", "nativeMessaging", "scripting"}
     ]
+    manifest["host_permissions"] = ["https://api.openai.com/*"]
     output = io.BytesIO()
     with ZipFile(output, "w", compression=ZIP_STORED) as archive:
         for name in sorted(EXTENSION_FILES):

@@ -63,13 +63,16 @@ class PackagedExtensionTest(PanelTestCase):
         manifest = await self.panel.evaluate("() => chrome.runtime.getManifest()")
         self.assertNotIn("debugger", manifest["permissions"])
         self.assertNotIn("nativeMessaging", manifest["permissions"])
+        self.assertNotIn("scripting", manifest["permissions"])
+        self.assertEqual(manifest["host_permissions"], ["https://api.openai.com/*"])
         self.assertFalse((self.extension_path / "control.html").exists())
         self.assertFalse((self.extension_path / "companion-client.js").exists())
+        self.assertFalse((self.extension_path / "page-reader.js").exists())
         await self.panel.get_by_role("button", name="Organize tabs", exact=True).click()
         await expect(self.panel.get_by_role("status")).to_contain_text("Add your OpenAI API key")
         await self.assert_no_groups()
 
-    async def test_browser_request_inspects_pages_and_applies_only_after_approval(self):
+    async def test_browser_request_uses_only_metadata_and_applies_only_after_approval(self):
         await self.save_key()
         await self.install_api_fixture()
         await self.organize()
@@ -79,8 +82,9 @@ class PackagedExtensionTest(PanelTestCase):
         self.assertEqual(request["text"]["format"]["type"], "json_schema")
         context = json.loads(request["input"])
         self.assertEqual(len(context["tabs"]), 6)
-        self.assertEqual(len(context["page_reads"]), 2)
-        self.assertTrue(any("pasta" in read["content"] for read in context["page_reads"]))
+        self.assertEqual(set(context), {"tabs"})
+        for tab in context["tabs"]:
+            self.assertEqual(set(tab), {"id", "title", "url"})
         self.assertNotIn("test-key", json.dumps(request))
         await self.assert_no_groups()
         await self.panel.get_by_role("button", name="Reject", exact=True).click()
@@ -119,18 +123,6 @@ class PackagedExtensionTest(PanelTestCase):
         await self.panel.locator("#remember-key").check()
         await self.panel.get_by_role("button", name="Save settings", exact=True).click()
         await expect(self.panel.locator("#settings-status")).to_have_text("Key saved on this device.")
-        page_key = await self.panel.evaluate("""async () => {
-            const tab = (await tabGroupState(true)).tabs[0];
-            const [result] = await chrome.scripting.executeScript({
-                target: {tabId: tab.chrome_id},
-                func: async () => {
-                    try { return (await chrome.storage.local.get('apiKey')).apiKey || null; }
-                    catch { return null; }
-                },
-            });
-            return result.result;
-        }""")
-        self.assertIsNone(page_key, "Page scripts must not read the stored API key")
         await self.panel.evaluate("() => chrome.storage.session.clear()")
         await self.panel.reload()
         await self.panel.locator("#settings summary").click()
