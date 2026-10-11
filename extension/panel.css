@@ -780,3 +780,17 @@ li:hover {
   outline: none;
   filter: none;
 }
+
+.model-options {
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.model-option {
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+.model-discovery-status {
+  margin-bottom: 4px;
+  font-size: 12px;
+}

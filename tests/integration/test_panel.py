@@ -26,6 +26,10 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
         extension_id = await load_extension(self.context, self.extension_path)
         await create_test_tabs(self.context)
         self.panel = await self.context.new_page()
+        # Discovery is offline too; no test credentials are sent to OpenAI.
+        await self.panel.route("https://api.openai.com/v1/models", lambda route: route.fulfill(json={
+            "data": [{"id": "gpt-4.1-mini", "created": 1}, {"id": "gpt-4.1", "created": 0}],
+        }))
         await self.panel.goto(f"chrome-extension://{extension_id}/panel.html")
         await self.panel.wait_for_function("document.querySelector('#approve').disabled")
 

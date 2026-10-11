@@ -1,27 +1,44 @@
 // Render the menu inside the panel so Chrome does not open a separate native macOS menu.
-export function mountModelPicker(root, models) {
+export function mountModelPicker(root, models, onOpen = () => {}) {
   const trigger = root.querySelector("#api-model");
   const list = root.querySelector("#model-options");
   const picker = root.querySelector("#model-picker");
   const label = root.querySelector("#selected-model");
-  const options = models.map(model => {
-    const option = document.createElement("button");
-    option.type = "button";
-    option.className = "model-option";
-    option.setAttribute("role", "option");
-    option.setAttribute("aria-label", model.name);
-    option.tabIndex = -1;
-    option.textContent = model.name;
-    option.dataset.value = model.id;
-    option.addEventListener("click", () => {
-      setValue(model.id);
-      close();
-      trigger.focus();
-      trigger.dispatchEvent(new Event("input", {bubbles: true}));
+  let options = [];
+  let rebuilding = false;
+
+  function setModels(items) {
+    // Refreshing an open list replaces its focused option; keep the menu and focus in place.
+    const focused = list.contains(document.activeElement);
+    const expanded = !list.hidden;
+    rebuilding = true;
+    const value = trigger.value || items[0].id;
+    models = items;
+    list.replaceChildren();
+    options = models.map(model => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.className = "model-option";
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-label", model.name);
+      option.tabIndex = -1;
+      option.textContent = model.name;
+      option.dataset.value = model.id;
+      option.addEventListener("click", () => {
+        setValue(model.id);
+        close();
+        trigger.focus();
+        trigger.dispatchEvent(new Event("input", {bubbles: true}));
+      });
+      list.append(option);
+      return option;
     });
-    list.append(option);
-    return option;
-  });
+    setValue(value);
+    list.hidden = !expanded;
+    trigger.setAttribute("aria-expanded", String(expanded));
+    if (focused) options.find(option => option.dataset.value === value)?.focus();
+    rebuilding = false;
+  }
 
   function setValue(value) {
     trigger.value = value;
@@ -41,6 +58,8 @@ export function mountModelPicker(root, models) {
     list.hidden = false;
     trigger.setAttribute("aria-expanded", "true");
     options[Math.max(0, index)].focus();
+    options[Math.max(0, index)].scrollIntoView({block: "nearest"});
+    onOpen();
   }
 
   trigger.addEventListener("click", () => list.hidden ? open() : close());
@@ -60,6 +79,7 @@ export function mountModelPicker(root, models) {
     if (next !== undefined) {
       event.preventDefault();
       options[next].focus();
+      options[next].scrollIntoView({block: "nearest"});
     } else if (event.key === "Escape") {
       event.preventDefault();
       close();
@@ -74,9 +94,9 @@ export function mountModelPicker(root, models) {
     if (!picker.contains(event.target)) close();
   });
   picker.addEventListener("focusout", event => {
-    if (!picker.contains(event.relatedTarget)) close();
+    if (!rebuilding && !picker.contains(event.relatedTarget)) close();
   });
 
-  setValue(models[0].id);
-  return {setValue, close};
+  setModels(models);
+  return {setValue, setModels, close};
 }

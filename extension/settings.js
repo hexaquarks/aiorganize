@@ -1,8 +1,9 @@
+import {fetchModels} from "./models.js";
 import {mountModelPicker} from "./model-picker.js";
 
 export const DEFAULT_MODEL = "gpt-4.1-mini";
-// Keep the picker small; custom IDs still have to pass the same connection test.
-export const SUPPORTED_MODELS = [
+// These defaults remain usable when model discovery is unavailable.
+export const FALLBACK_MODELS = [
   {id: DEFAULT_MODEL, name: "GPT-4.1 mini", note: "Fast and affordable for grouping tabs."},
   {id: "gpt-4.1", name: "GPT-4.1", note: "More capable for complex topics."},
 ];
@@ -59,7 +60,61 @@ export async function mountSettings(root, testConnection) {
   let editing = true;
   let testing = false;
 
-  const modelPicker = mountModelPicker(root, SUPPORTED_MODELS);
+  let availableModels = [...FALLBACK_MODELS];
+  let loadedForKey = "";
+  let loadedAt = 0;
+  let discovery = null;
+  const modelStatus = root.querySelector("#model-discovery-status");
+  const modelPicker = mountModelPicker(root, availableModels, () => { refreshModels(); });
+
+  function resetModels() {
+    discovery?.abort();
+    discovery = null;
+    loadedForKey = "";
+    availableModels = [...FALLBACK_MODELS];
+    preserveSelection();
+    modelStatus.textContent = "Enter your key to load available models.";
+  }
+
+  function preserveSelection() {
+    if (!availableModels.some(item => item.id === model.value)) {
+      availableModels.push({
+        id: model.value, name: FALLBACK_MODELS.find(item => item.id === model.value)?.name || model.value,
+        note: "Not listed for this key. Test the connection to check access.",
+      });
+    }
+    modelPicker.setModels(availableModels);
+  }
+
+  async function refreshModels() {
+    const apiKey = key.value.trim();
+    const cached = loadedForKey === apiKey && Date.now() - loadedAt < 300000;
+    if (!apiKey || testing || cached || discovery) return;
+    const controller = new AbortController();
+    discovery = controller;
+    modelStatus.textContent = "Loading available models…";
+    try {
+      const items = await fetchModels(apiKey, controller.signal);
+      if (controller.signal.aborted || key.value.trim() !== apiKey) return;
+      availableModels = items.map(item => ({
+        ...item,
+        name: FALLBACK_MODELS.find(fallback => fallback.id === item.id)?.name || item.name,
+      }));
+      availableModels.sort((a, b) => Number(b.id === DEFAULT_MODEL) - Number(a.id === DEFAULT_MODEL));
+      preserveSelection();
+      loadedForKey = apiKey;
+      loadedAt = Date.now();
+      modelStatus.textContent = items.length ? "Available models · default first, then newest." :
+        "No text models found. You can still test a custom model ID.";
+      update();
+    } catch {
+      if (!controller.signal.aborted) {
+        modelStatus.textContent = "Could not load models. Reopen the menu to retry, or use a custom ID.";
+      }
+    } finally {
+      if (discovery === controller) discovery = null;
+    }
+  }
 
   function selectedModel() {
     return custom.value.trim() || model.value;
@@ -83,8 +138,9 @@ export async function mountSettings(root, testConnection) {
     model.disabled = Boolean(custom.value.trim());
     if (testing || model.disabled) modelPicker.close();
     submit.disabled = testing || !key.value.trim() || !selectedModel();
+    const modelNote = availableModels.find(item => item.id === model.value)?.note;
     root.querySelector("#model-note").textContent = custom.value.trim() ?
-      "Custom models must support structured outputs." : SUPPORTED_MODELS.find(item => item.id === model.value).note;
+      "Custom models must support structured outputs." : (modelNote || "Test to verify model compatibility.");
     root.dispatchEvent(new Event("connectionchange"));
   }
 
@@ -92,7 +148,7 @@ export async function mountSettings(root, testConnection) {
     key.value = saved.apiKey;
     key.type = "password";
     root.querySelector("#reveal-key").setAttribute("aria-label", "Show API key");
-    const modelId = SUPPORTED_MODELS.some(item => item.id === saved.model) ? saved.model : DEFAULT_MODEL;
+    const modelId = availableModels.some(item => item.id === saved.model) ? saved.model : DEFAULT_MODEL;
     modelPicker.setValue(modelId);
     custom.value = model.value === saved.model ? "" : saved.model;
     root.querySelector("#advanced").open = Boolean(custom.value);
@@ -104,6 +160,7 @@ export async function mountSettings(root, testConnection) {
     if (testing) return;
     if (!editing) fillDraft();
     editing = true;
+    refreshModels();
     update();
     key.focus();
   }
@@ -111,7 +168,7 @@ export async function mountSettings(root, testConnection) {
   function showSaved() {
     editing = false;
     key.value = "";
-    const label = SUPPORTED_MODELS.find(item => item.id === saved.model)?.name || saved.model;
+    const label = FALLBACK_MODELS.find(item => item.id === saved.model)?.name || saved.model;
     const storageLabel = saved.remember ? "Remembered on this device" : "Session only";
     root.querySelector("#connection-detail").textContent = `${label} · ${storageLabel}`;
     const time = new Date(saved.verifiedAt);
@@ -137,6 +194,8 @@ export async function mountSettings(root, testConnection) {
   for (const field of [key, model, custom, remember]) {
     field.addEventListener("input", () => { feedback.hidden = true; update(); });
   }
+  key.addEventListener("input", () => { resetModels(); update(); });
+  key.addEventListener("blur", () => { refreshModels(); });
   root.querySelector("#reveal-key").addEventListener("click", event => {
     key.type = key.type === "password" ? "text" : "password";
     event.currentTarget.setAttribute("aria-label", key.type === "password" ? "Show API key" : "Hide API key");
@@ -155,6 +214,8 @@ export async function mountSettings(root, testConnection) {
       feedback.textContent = "Enter a valid key and model ID.";
       return;
     }
+    discovery?.abort();
+    discovery = null;
     testing = true;
     root.querySelector("#settings-fields").disabled = true;
     root.querySelector("#settings-toggle").disabled = true;
@@ -217,6 +278,7 @@ export async function mountSettings(root, testConnection) {
     if (testing) return;
     await clearKey();
     saved = {apiKey: "", model: DEFAULT_MODEL};
+    resetModels();
     fillDraft();
     openEditor();
   });
