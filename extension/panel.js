@@ -1,4 +1,5 @@
-import {requestProposal} from "./llm.js";
+import {validateProposal} from "./proposal.js";
+import {requestProposal, testConnection} from "./llm.js";
 import {getTabState, applyGroups} from "./tabs.js";
 import {mountSettings} from "./settings.js";
 
@@ -9,35 +10,6 @@ function siteLabel(url) {
   } catch {
     return "Local page";
   }
-}
-
-function validateProposal(proposal, snapshot) {
-  if (!Array.isArray(proposal?.groups) || proposal.groups.length === 0) {
-    throw new Error("No groups were returned. Organize again to get a new preview.");
-  }
-  const names = new Set();
-  const expectedIds = new Set(snapshot.map(tab => tab.id));
-  const assignedIds = new Set();
-  for (const group of proposal.groups) {
-    const name = typeof group.name === "string" ? group.name.trim().toLowerCase() : "";
-    if (!name || group.name.length > 7 || names.has(name) ||
-        !Array.isArray(group.tab_ids) || group.tab_ids.length === 0) {
-      throw new Error("The proposed groups are invalid. Organize again to get a new preview.");
-    }
-    names.add(name);
-    for (const id of group.tab_ids) {
-      if (!expectedIds.has(id) || assignedIds.has(id)) {
-        throw new Error("The proposal has missing, duplicate, or unknown tabs. Organize again.");
-      }
-      assignedIds.add(id);
-    }
-  }
-  if (assignedIds.size !== expectedIds.size) {
-    throw new Error("The proposal has missing tabs. Organize again.");
-  }
-  return proposal.groups.toSorted((a, b) =>
-    Number(a.name.trim().toLowerCase() === "other") - Number(b.name.trim().toLowerCase() === "other")
-  );
 }
 
 function renderGroups(root, groups, snapshot) {
@@ -93,6 +65,33 @@ export function mountPanel(root, propose = requestProposal) {
   const preview = root.querySelector("#preview");
   const status = root.querySelector("#status");
   let pending = null;
+  let busy = false;
+  let tabCount = 0;
+
+  function updateOrganize() {
+    organize.disabled = busy || root.querySelector("main").dataset.connected !== "true";
+    root.querySelector("#organize-label").textContent = busy ? "Working…" :
+      (tabCount ? `Organize ${tabCount} tabs` : "Organize tabs");
+  }
+
+  async function refreshCount() {
+    const window = await chrome.windows.getCurrent();
+    const state = await getTabState();
+    tabCount = state.tabs.filter(tab => tab.window_id === window.id).length;
+    updateOrganize();
+  }
+
+  root.addEventListener("connectionchange", () => {
+    clearPreview();
+    if (!busy) status.textContent = "";
+    updateOrganize();
+  }, {signal: listeners.signal});
+  const handleTabsChanged = () => refreshCount().catch(() => {});
+  for (const event of [chrome.tabs.onCreated, chrome.tabs.onRemoved, chrome.tabs.onAttached, chrome.tabs.onDetached]) {
+    event.addListener(handleTabsChanged);
+    listeners.signal.addEventListener("abort", () => event.removeListener(handleTabsChanged));
+  }
+  refreshCount().catch(() => {});
 
   function clearPreview() {
     pending = null;
@@ -101,13 +100,17 @@ export function mountPanel(root, propose = requestProposal) {
     approve.disabled = true;
   }
 
-  function setBusy(busy) {
-    organize.disabled = busy;
+  function setBusy(value) {
+    busy = value;
+    updateOrganize();
+    root.querySelector("#settings-toggle").disabled = busy;
+    root.querySelector("#manage-connection").disabled = busy;
+    root.querySelector("#forget-key").disabled = busy;
+    root.querySelector("#edit-connection").disabled = busy;
     approve.disabled = busy || pending === null;
     reject.disabled = busy;
     root.querySelector("main").setAttribute("aria-busy", String(busy));
     root.querySelector("#activity").classList.toggle("spinning", busy);
-    root.querySelector("#organize-label").textContent = busy ? "Working…" : "Organize tabs";
   }
 
   clearPreview();
@@ -175,4 +178,4 @@ export function mountPanel(root, propose = requestProposal) {
 
 // panel.html loads this module after its document has been parsed.
 export const panel = mountPanel(document);
-await mountSettings(document);
+await mountSettings(document, testConnection);

@@ -16,7 +16,7 @@ PROJECT = Path(__file__).resolve().parents[1]
 EXTENSION_FILES = (
     "background.js", "manifest.json", "panel.css", "panel.html",
     "panel.js", "llm.js", "tabs.js",
-    "settings.js", "icons/brand.png",
+    "settings.js", "proposal.js", "icons/brand.png",
 )
 
 
