@@ -6,8 +6,8 @@ from pathlib import Path
 
 from playwright.async_api import async_playwright, expect
 
-from src.chrome_groups import GROUP_BROWSER_ARGS, load_group_extension
-from demos.fixtures import EXTENSION_PATH, create_test_tabs
+from src.dev import CHROME_ARGS, load_extension
+from tests.fixtures import EXTENSION_PATH, create_test_tabs
 
 
 STORE = Path(__file__).resolve().parents[1] / "store"
@@ -43,19 +43,18 @@ async def main() -> None:
 
         with tempfile.TemporaryDirectory(prefix="aiorganize-store-") as profile:
             context = await playwright.chromium.launch_persistent_context(
-                profile, channel="chrome", headless=True, args=GROUP_BROWSER_ARGS,
+                profile, channel="chrome", headless=True, args=CHROME_ARGS,
                 ignore_default_args=["--disable-extensions"],
                 viewport={"width": 1280, "height": 800}, device_scale_factor=1, color_scheme="light",
             )
             try:
-                worker = await load_group_extension(context, EXTENSION_PATH)
+                extension_id = await load_extension(context, EXTENSION_PATH)
                 await create_test_tabs(context)
                 panel = await context.new_page()
-                await panel.goto(worker.url.removesuffix("background.js") + "panel.html")
+                await panel.goto(f"chrome-extension://{extension_id}/panel.html")
                 # Use the real UI with a deterministic proposal; no API call or personal tabs are captured.
                 await panel.evaluate("""async () => {
-                    const {panel} = await import('./panel-entry.js');
-                    const {mountPanel} = await import('./panel.js');
+                    const {panel, mountPanel} = await import('./panel.js');
                     panel.destroy();
                     mountPanel(document, async ({snapshot}) => ({groups: [
                         {name: 'Dev', tab_ids: snapshot.slice(0, 2).map(tab => tab.id)},

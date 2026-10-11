@@ -6,7 +6,7 @@ from urllib.error import HTTPError
 from urllib.parse import parse_qs
 
 from src import webstore
-from src.package_extension import EXTENSION_FILES, PROJECT
+from src.build import EXTENSION_FILES, PROJECT
 from src.webstore import WebStoreClient, release, request_json, store_versions
 
 

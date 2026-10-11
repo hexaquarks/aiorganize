@@ -1,10 +1,10 @@
 Local preparation
 
-Run uv sync and make test. Run make package-extension for a working-tree preview in dist/.
-The ZIP uses a fixed allowlist and stable ZIP metadata, omits the terminal demo control page and
-debugger, nativeMessaging, and scripting permissions. It includes no companion, page reader,
-API key, tests, or store submission material. Host access is limited to the model API.
-Regenerate artwork and the sample panel screenshot with uv run python -m demos.store_assets.
+Run uv sync and make test. Run make build for a working-tree preview in dist/.
+The ZIP packages the same extension files used in development, using a fixed allowlist and stable
+ZIP metadata. It includes no API key, Python, tests, or store submission material. Host access is
+limited to the model API.
+Regenerate artwork and the sample panel screenshot with uv run python -m tests.store_assets.
 The screenshot uses offline fixtures; it is not evidence of a live model or Web Store installation.
 
 Release versioning
@@ -14,7 +14,7 @@ v<version> Git tag on the reviewed release commit. Tags are the extension's rele
 the full history and tags before release checks. Versions have 1–4 numeric parts, each 0–65535,
 no leading zeros, and cannot be all zero. Missing components compare as zero.
 After the release tag exists, run:
-  uv run python -m src.package_extension --tag v0.1.0
+  uv run python -m src.build --tag v0.1.0
 The builder reads only the tag's committed files, checks ancestor release versions, and emits a ZIP
 and SHA-256 sidecar in dist/. It does not create tags, push, upload, or publish.
 If the latest store version has no ancestor tag, also pass --previous-version <latest-store-version>.
@@ -24,11 +24,13 @@ Rebuilding a tag uses its ancestor history so later releases do not prevent repr
 Store preparation — publishing requires separate explicit authorization
 
 Use store/listing.json for listing and privacy fields. Review the sensitive-data categories against
-the current dashboard. Host store/privacy.html and enter its public URL in the dashboard. Upload the icon, 440x280 promo image, and 1280x800 screenshot separately.
+the current dashboard. Host store/privacy.html and enter its public URL in the dashboard.
+Upload the icon, 440x280 promo image, and 1280x800 screenshot separately.
 Review instructions: install the extension, open API settings, enter an OpenAI API key, and select
 a model the account can use. Generate, reject, and approve proposals on sample tabs. The release
 needs no Python, companion, terminal, or checkout. Never include credentials in the ZIP or listing.
-The Python companion is development-only: make run loads the unpacked source and enables that mode.
+Run make dev to open a dedicated Chrome profile with the source extension. Add the API key in the
+extension settings, as in the release. Reload the extension after edits; development needs no ZIP.
 
 Owner-only distribution
 
