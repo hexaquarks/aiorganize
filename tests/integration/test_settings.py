@@ -6,6 +6,46 @@ from tests.integration.test_panel import PanelTestCase
 
 
 class ConnectionSetupTest(PanelTestCase):
+    async def test_old_unverified_settings_use_the_new_default(self):
+        old_settings = [
+            {"model": "gpt-4o-mini"},
+            {"apiKey": "legacy-test-key", "model": "gpt-4.1-mini"},
+            {"connection": {"apiKey": "legacy-test-key", "model": "gpt-4o-mini", "verifiedAt": None}},
+        ]
+        for local_settings in old_settings:
+            with self.subTest(local_settings=local_settings):
+                await self.panel.evaluate("""async settings => {
+                    await chrome.storage.local.clear();
+                    await chrome.storage.session.clear();
+                    await chrome.storage.local.set(settings);
+                }""", local_settings)
+                await self.panel.reload()
+                await expect(self.panel.locator("#api-model")).to_contain_text("GPT-6.1 Sol")
+                await expect(self.panel.locator("#custom-model")).to_be_empty()
+                await expect(self.panel.locator("#api-model")).to_be_enabled()
+                await expect(self.panel.locator("#organize")).to_be_disabled()
+                settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+                self.assertEqual(settings["model"], "gpt-6.1-sol")
+                self.assertEqual(settings["apiKey"], local_settings.get("apiKey") or
+                                 local_settings.get("connection", {}).get("apiKey", ""))
+
+    async def test_verified_older_connection_is_preserved_until_retested(self):
+        connection = {
+            "apiKey": "verified-legacy-test-key", "model": "gpt-4o-mini",
+            "verifiedAt": "2026-10-01T12:00:00Z",
+        }
+        await self.panel.evaluate("""async connection => {
+            await chrome.storage.local.clear();
+            await chrome.storage.session.set({connection});
+        }""", connection)
+        await self.panel.reload()
+        await expect(self.panel.locator("#ready")).to_be_visible()
+        await expect(self.panel.locator("#connection-detail")).to_contain_text("gpt-4o-mini")
+        await expect(self.panel.locator("#organize")).to_be_enabled()
+        settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        self.assertEqual(settings["model"], connection["model"])
+        self.assertEqual(settings["verifiedAt"], connection["verifiedAt"])
+
     async def test_synthetic_validation_storage_reveal_and_reload(self):
         requests = []
 

@@ -14,11 +14,17 @@ export async function getSettings() {
   const local = await chrome.storage.local.get(["connection", "apiKey", "model"]);
   const session = await chrome.storage.session.get(["connection", "apiKey"]);
   const connection = session.connection || local.connection;
-  if (connection) return {...connection, remember: !session.connection};
-  // Previously saved keys remain available, but must be verified before use.
+  if (connection) {
+    return {
+      ...connection,
+      model: connection.verifiedAt ? connection.model : DEFAULT_MODEL,
+      remember: !session.connection,
+    };
+  }
+  // Keep legacy keys, but discard unverified model preferences so setup uses the current default.
   return {
     apiKey: session.apiKey || local.apiKey || "",
-    model: local.model || DEFAULT_MODEL,
+    model: DEFAULT_MODEL,
     remember: Boolean(local.apiKey),
     verifiedAt: null,
   };
