@@ -8,8 +8,8 @@ from pathlib import Path
 from unittest.mock import patch
 from zipfile import ZipFile
 
-from src import package_extension
-from src.package_extension import EXTENSION_FILES, PROJECT, build_zip, chrome_version, tagged_files
+from src import build
+from src.build import EXTENSION_FILES, PROJECT, build_zip, chrome_version, tagged_files
 
 
 class PackageExtensionTest(unittest.TestCase):
@@ -33,7 +33,9 @@ class PackageExtensionTest(unittest.TestCase):
             self.assertNotIn("scripting", manifest["permissions"])
             self.assertEqual(manifest["host_permissions"], ["https://api.openai.com/*"])
             self.assertNotIn("page-reader.js", archive.namelist())
-            self.assertNotIn(b"companion", archive.read("panel-entry.js"))
+            # Development and release execute exactly the same source files.
+            for name in EXTENSION_FILES:
+                self.assertEqual(archive.read(name), self.files[name])
             self.assertEqual(manifest["version"], "0.1.0")
             for icon in manifest["icons"].values():
                 self.assertTrue(archive.read(icon).startswith(b"\x89PNG\r\n\x1a\n"))
@@ -77,10 +79,10 @@ class PackageExtensionTest(unittest.TestCase):
             run_git("-c", "commit.gpgsign=false", "commit", "-m", "Test")
             run_git("tag", "v0.1.0")
             (root / "extension/panel.js").write_text("dirty change")
-            with patch.object(package_extension, "PROJECT", root):
+            with patch.object(build, "PROJECT", root):
                 self.assertEqual(tagged_files("v0.1.0"), self.files)
-                with patch("sys.argv", ["package_extension", "--tag", "v0.1.0"]):
-                    package_extension.main()
+                with patch("sys.argv", ["build", "--tag", "v0.1.0"]):
+                    build.main()
             archive = root / "dist/aiorganize-v0.1.0.zip"
             self.assertEqual(archive.read_bytes(), build_zip(self.files, "v0.1.0", []))
 
@@ -92,18 +94,18 @@ class PackageExtensionTest(unittest.TestCase):
                 run_git("add", "extension")
                 run_git("-c", "commit.gpgsign=false", "commit", "-m", "Update version")
                 run_git("tag", f"v{version}")
-                with patch.object(package_extension, "PROJECT", root):
-                    with patch("sys.argv", ["package_extension", "--tag", f"v{version}"]):
+                with patch.object(build, "PROJECT", root):
+                    with patch("sys.argv", ["build", "--tag", f"v{version}"]):
                         if version == "0.0.9":
                             with patch("sys.stderr", new=io.StringIO()), self.assertRaises(SystemExit) as error:
-                                package_extension.main()
+                                build.main()
                             self.assertEqual(error.exception.code, 2)
                         else:
-                            package_extension.main()
+                            build.main()
 
-            with patch.object(package_extension, "PROJECT", root):
-                with patch("sys.argv", ["package_extension", "--tag", "v0.1.0"]):
-                    package_extension.main()
+            with patch.object(build, "PROJECT", root):
+                with patch("sys.argv", ["build", "--tag", "v0.1.0"]):
+                    build.main()
             self.assertEqual(archive.read_bytes(), build_zip(self.files, "v0.1.0", []))
 
     def test_release_rejects_symlink_assets(self):
@@ -112,10 +114,10 @@ class PackageExtensionTest(unittest.TestCase):
             (root / "extension").mkdir()
             (root / "secret").write_text("do-not-package")
             (root / "extension/background.js").symlink_to(root / "secret")
-            with patch.object(package_extension, "PROJECT", root):
-                with patch("sys.argv", ["package_extension", "--preview"]):
+            with patch.object(build, "PROJECT", root):
+                with patch("sys.argv", ["build", "--preview"]):
                     with patch("sys.stderr", new=io.StringIO()), self.assertRaises(SystemExit) as error:
-                        package_extension.main()
+                        build.main()
                     self.assertEqual(error.exception.code, 2)
             self.assertFalse((root / "dist").exists())
 

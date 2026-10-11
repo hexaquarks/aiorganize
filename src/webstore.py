@@ -11,7 +11,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from .package_extension import build_zip, chrome_version, git, tagged_files
+from .build import build_zip, chrome_version, git, tagged_files
 
 
 API_URL = "https://chromewebstore.googleapis.com"

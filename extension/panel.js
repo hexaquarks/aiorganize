@@ -1,4 +1,6 @@
-import {requestProposal} from "./proposal-client.js";
+import {requestProposal} from "./llm.js";
+import {getTabState, applyGroups} from "./tabs.js";
+import {mountSettings} from "./settings.js";
 
 function siteLabel(url) {
   try {
@@ -118,7 +120,7 @@ export function mountPanel(root, propose = requestProposal) {
     try {
       // Bind to the panel's own window, even if focus moves while generating a proposal.
       const window = await chrome.windows.getCurrent();
-      const state = await tabGroupState(true);
+      const state = await getTabState();
       const snapshot = state.tabs.filter(tab => tab.window_id === window.id);
       if (!snapshot.length) {
         throw new Error("This window has no tabs to organize.");
@@ -156,8 +158,8 @@ export function mountPanel(root, propose = requestProposal) {
     setBusy(true);
     status.textContent = "Applying approved groups…";
     try {
-      // The existing Chrome helper rechecks the snapshot before any tab mutations.
-      await applyApprovedGroups(pending);
+      // Recheck the snapshot before any tab mutations.
+      await applyGroups(pending);
       clearPreview();
       status.textContent = "Your tabs are organized.";
     } catch (error) {
@@ -170,3 +172,7 @@ export function mountPanel(root, propose = requestProposal) {
 
   return {destroy: () => listeners.abort()};
 }
+
+// panel.html loads this module after its document has been parsed.
+export const panel = mountPanel(document);
+await mountSettings(document);

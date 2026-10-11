@@ -3,8 +3,8 @@ import unittest
 
 from playwright.async_api import async_playwright, expect
 
-from src.chrome_groups import GROUP_BROWSER_ARGS, load_group_extension
-from demos.fixtures import EXTENSION_PATH, create_test_tabs
+from src.dev import CHROME_ARGS, load_extension
+from tests.fixtures import EXTENSION_PATH, create_test_tabs
 
 
 class PanelTestCase(unittest.IsolatedAsyncioTestCase):
@@ -19,22 +19,21 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
             self.profile.name,
             channel="chrome",
             headless=True,
-            args=GROUP_BROWSER_ARGS,
+            args=CHROME_ARGS,
             ignore_default_args=["--disable-extensions"],
         )
         self.addAsyncCleanup(self.context.close)
-        self.worker = await load_group_extension(self.context, self.extension_path)
+        extension_id = await load_extension(self.context, self.extension_path)
         await create_test_tabs(self.context)
         self.panel = await self.context.new_page()
-        await self.panel.goto(self.worker.url.removesuffix("background.js") + "panel.html")
+        await self.panel.goto(f"chrome-extension://{extension_id}/panel.html")
         await self.panel.wait_for_function("document.querySelector('#approve').disabled")
 
     async def install_proposal_fixture(self, *, invalid=False, delayed=False):
         # Fake proposals live only in tests; the installed extension never fabricates AI results.
         await self.panel.evaluate(
             """async ({invalid, delayed}) => {
-                const {panel} = await import('./panel-entry.js');
-                const {mountPanel} = await import('./panel.js');
+                const {panel, mountPanel} = await import('./panel.js');
                 panel.destroy();
                 mountPanel(document, async ({snapshot}) => {
                     if (delayed) await new Promise(resolve => { window.resolveProposal = resolve; });
@@ -54,25 +53,18 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
         await expect(self.panel.locator("#preview")).to_be_visible()
 
     async def assert_no_groups(self):
-        state = await self.worker.evaluate("() => tabGroupState(true)")
+        state = await self.panel.evaluate("async () => (await import('./tabs.js')).getTabState()")
         self.assertEqual(state["groups"], [])
         self.assertTrue(all(tab["group_id"] == -1 for tab in state["tabs"]))
 
 
 class ExtensionPanelTest(PanelTestCase):
-    async def test_disconnected_agent_reports_error_without_mutations(self):
-        self.assertTrue(await self.worker.evaluate(
+    async def test_missing_api_key_reports_error_without_mutations(self):
+        self.assertTrue(await self.panel.evaluate(
             "async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick"
         ))
-        await self.panel.evaluate("""async () => {
-            const {panel} = await import('./panel-entry.js');
-            const {mountPanel} = await import('./panel.js');
-            const {requestProposal} = await import('./companion-client.js');
-            panel.destroy();
-            mountPanel(document, request => requestProposal(request, {hostName: 'com.aiorganize.not_installed'}));
-        }""")
         await self.panel.get_by_role("button", name="Organize tabs", exact=True).click()
-        await expect(self.panel.get_by_role("status")).to_contain_text("Python companion unavailable")
+        await expect(self.panel.get_by_role("status")).to_contain_text("Add your OpenAI API key")
         await expect(self.panel.locator("#preview")).to_be_hidden()
         await expect(self.panel.locator("#approve")).to_be_disabled()
         await self.assert_no_groups()
@@ -91,9 +83,45 @@ class ExtensionPanelTest(PanelTestCase):
         await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
         await expect(self.panel.get_by_role("status")).to_have_text("Your tabs are organized.")
         await expect(self.panel.locator("#preview")).to_be_hidden()
-        state = await self.worker.evaluate("() => tabGroupState()")
+        state = await self.panel.evaluate("async () => (await import('./tabs.js')).getTabState()")
         self.assertEqual({group["name"] for group in state["groups"]}, {"Dev", "Other"})
         self.assertTrue(all(tab["group_id"] != -1 for tab in state["tabs"]))
+        self.assertEqual(
+            {group["name"]: group["color"] for group in state["groups"]},
+            {"Dev": "blue", "Other": "grey"},
+        )
+        by_group = {group["id"]: group["name"] for group in state["groups"]}
+        dev_indices = [tab["index"] for tab in state["tabs"] if by_group[tab["group_id"]] == "Dev"]
+        other_indices = [tab["index"] for tab in state["tabs"] if by_group[tab["group_id"]] == "Other"]
+        self.assertGreater(min(other_indices), max(dev_indices))
+
+    async def test_navigated_tab_invalidates_preview_before_mutation(self):
+        await self.install_proposal_fixture()
+        await self.organize()
+        await self.context.pages[0].goto("about:blank")
+        await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
+        await expect(self.panel.get_by_role("status")).to_contain_text("Tabs changed after preview")
+        await self.assert_no_groups()
+
+    async def test_closed_tab_invalidates_preview_before_mutation(self):
+        await self.install_proposal_fixture()
+        await self.organize()
+        await self.context.pages[0].close()
+        await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
+        await expect(self.panel.get_by_role("status")).to_contain_text("Tabs changed after preview")
+        await self.assert_no_groups()
+
+    async def test_moved_tab_invalidates_preview_before_mutation(self):
+        await self.install_proposal_fixture()
+        await self.organize()
+        await self.panel.evaluate("""async () => {
+            const {getTabState} = await import('./tabs.js');
+            const {tabs} = await getTabState();
+            await chrome.windows.create({tabId: tabs[0].chrome_id});
+        }""")
+        await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
+        await expect(self.panel.get_by_role("status")).to_contain_text("one browser window")
+        await self.assert_no_groups()
 
     async def test_added_tab_invalidates_preview_before_mutation(self):
         await self.install_proposal_fixture()
@@ -128,12 +156,12 @@ class ExtensionPanelTest(PanelTestCase):
 
     async def test_preview_stays_scoped_to_panel_window(self):
         await self.install_proposal_fixture()
-        other_window = await self.worker.evaluate("() => chrome.windows.create({url: 'about:blank'})")
+        other_window = await self.panel.evaluate("() => chrome.windows.create({url: 'about:blank'})")
         await self.organize()
         await expect(self.panel.locator("#summary")).to_have_text("6 tabs in 2 groups.")
         await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
         await expect(self.panel.get_by_role("status")).to_have_text("Your tabs are organized.")
-        state = await self.worker.evaluate("() => tabGroupState()")
+        state = await self.panel.evaluate("async () => (await import('./tabs.js')).getTabState()")
         other_tabs = [tab for tab in state["tabs"] if tab["window_id"] == other_window["id"]]
         self.assertEqual(len(other_tabs), 1)
         self.assertEqual(other_tabs[0]["group_id"], -1)

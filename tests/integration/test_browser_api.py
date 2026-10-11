@@ -7,19 +7,13 @@ from zipfile import ZipFile
 
 from playwright.async_api import expect
 
-from src.package_extension import EXTENSION_FILES, PROJECT, build_zip
+from src.build import EXTENSION_FILES, PROJECT, build_zip
 from tests.integration.test_panel import PanelTestCase
+from tests.fixtures import PRIVATE_PAGE_TEXT
 
 
-class PackagedExtensionTest(PanelTestCase):
+class BrowserApiTest(PanelTestCase):
     async def asyncSetUp(self):
-        directory = tempfile.TemporaryDirectory(prefix="aiorganize-package-test-")
-        self.addCleanup(directory.cleanup)
-        self.extension_path = Path(directory.name)
-        files = {name: (PROJECT / "extension" / name).read_bytes() for name in EXTENSION_FILES}
-        version = json.loads(files["manifest.json"])["version"]
-        with ZipFile(io.BytesIO(build_zip(files, f"v{version}", []))) as archive:
-            archive.extractall(self.extension_path)
         await super().asyncSetUp()
         self.requests = []
 
@@ -59,7 +53,7 @@ class PackagedExtensionTest(PanelTestCase):
 
         await self.panel.route("https://api.openai.com/v1/responses", respond)
 
-    async def test_release_has_no_companion_and_missing_key_changes_no_tabs(self):
+    async def test_minimal_permissions_and_missing_key_changes_no_tabs(self):
         manifest = await self.panel.evaluate("() => chrome.runtime.getManifest()")
         self.assertNotIn("debugger", manifest["permissions"])
         self.assertNotIn("nativeMessaging", manifest["permissions"])
@@ -86,13 +80,14 @@ class PackagedExtensionTest(PanelTestCase):
         for tab in context["tabs"]:
             self.assertEqual(set(tab), {"id", "title", "url"})
         self.assertNotIn("test-key", json.dumps(request))
+        self.assertNotIn(PRIVATE_PAGE_TEXT, json.dumps(request))
         await self.assert_no_groups()
         await self.panel.get_by_role("button", name="Reject", exact=True).click()
         await self.assert_no_groups()
         await self.organize()
         await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
         await expect(self.panel.get_by_role("status")).to_have_text("Your tabs are organized.")
-        state = await self.worker.evaluate("() => tabGroupState(true)")
+        state = await self.panel.evaluate("async () => (await import('./tabs.js')).getTabState()")
         self.assertEqual({group["name"] for group in state["groups"]}, {"Dev", "Other"})
 
     async def test_invalid_proposal_and_provider_error_are_safe(self):
@@ -142,10 +137,22 @@ class PackagedExtensionTest(PanelTestCase):
         await expect(self.panel.locator("#organize")).to_be_disabled()
         await asyncio.wait_for(self.request_started.wait(), timeout=10)
         await self.panel.evaluate("""async () => {
-            const {panel} = await import('./panel-entry.js');
+            const {panel} = await import('./panel.js');
             panel.destroy();
         }""")
         self.finish_request.set()
         await asyncio.wait_for(self.request_finished.wait(), timeout=10)
         await expect(self.panel.locator("#preview")).to_be_hidden()
         await self.assert_no_groups()
+
+
+class PackagedBrowserApiTest(BrowserApiTest):
+    async def asyncSetUp(self):
+        directory = tempfile.TemporaryDirectory(prefix="aiorganize-package-test-")
+        self.addCleanup(directory.cleanup)
+        self.extension_path = Path(directory.name)
+        files = {name: (PROJECT / "extension" / name).read_bytes() for name in EXTENSION_FILES}
+        version = json.loads(files["manifest.json"])["version"]
+        with ZipFile(io.BytesIO(build_zip(files, f"v{version}", []))) as archive:
+            archive.extractall(self.extension_path)
+        await super().asyncSetUp()
