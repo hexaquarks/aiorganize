@@ -2,7 +2,7 @@ import {SUPPORTED_MODELS} from "./model-catalog.js";
 import {fetchModels, ModelListError} from "./models.js";
 import {mountModelPicker} from "./model-picker.js";
 
-export const DEFAULT_MODEL = "gpt-4.1-mini";
+export const DEFAULT_MODEL = SUPPORTED_MODELS[0].id;
 
 async function restrictStorage() {
   await chrome.storage.local.setAccessLevel({accessLevel: "TRUSTED_CONTEXTS"});

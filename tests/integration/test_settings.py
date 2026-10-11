@@ -29,7 +29,7 @@ class ConnectionSetupTest(PanelTestCase):
         await expect(self.panel.locator("#organize")).to_be_enabled()
         self.assertEqual(len(requests), 1)
         request = requests[0]
-        self.assertEqual(request["model"], "gpt-4.1-mini")
+        self.assertEqual(request["model"], "gpt-6.1-sol")
         self.assertFalse(request["store"])
         self.assertEqual(request["text"]["format"]["name"], "tab_groups")
         tabs = json.loads(request["input"])["tabs"]
@@ -143,7 +143,7 @@ class ConnectionSetupTest(PanelTestCase):
         await trigger.focus()
         await trigger.press("ArrowDown")
         await expect(menu).to_be_visible()
-        await expect(self.panel.get_by_role("option", name="GPT-4.1 mini", exact=True)).to_be_focused()
+        await expect(self.panel.get_by_role("option", name="GPT-6.1 Sol", exact=True)).to_be_focused()
         trigger_box = await trigger.bounding_box()
         menu_box = await menu.bounding_box()
         self.assertEqual(trigger_box["x"], menu_box["x"])

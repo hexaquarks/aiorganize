@@ -72,7 +72,7 @@ class BrowserApiTest(PanelTestCase):
         await self.organize()
         request = self.requests[0]
         self.assertFalse(request["store"])
-        self.assertEqual(request["model"], "gpt-4.1-mini")
+        self.assertEqual(request["model"], "gpt-6.1-sol")
         self.assertEqual(request["text"]["format"]["type"], "json_schema")
         context = json.loads(request["input"])
         self.assertEqual(len(context["tabs"]), 6)

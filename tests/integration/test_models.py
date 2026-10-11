@@ -14,7 +14,7 @@ class ModelDiscoveryTest(PanelTestCase):
         async def respond(route):
             requests.append(route.request)
             await route.fulfill(json={"data": [
-                {"id": "gpt-4.1-mini", "created": 1},
+                {"id": "gpt-6.1-sol", "created": 1},
                 {"id": "gpt-5-mini", "created": 10},
                 {"id": "gpt-5-mini", "created": 10},
                 {"id": "gpt-5", "created": 9},
@@ -43,7 +43,7 @@ class ModelDiscoveryTest(PanelTestCase):
         await expect(self.panel.locator("#model-discovery-status")).to_contain_text("then newest")
         await expect(self.panel.get_by_role("listbox")).to_be_visible()
         self.assertEqual(await self.panel.get_by_role("option").all_text_contents(), [
-            "GPT-4.1 mini", "GPT-5 Mini",
+            "GPT-6.1 Sol", "GPT-5 Mini",
         ])
         self.assertEqual(len(requests), 1)
         self.assertEqual(requests[0].method, "GET")
@@ -99,7 +99,7 @@ class ModelDiscoveryTest(PanelTestCase):
         await expect(options).to_have_count(15)
         account_ids = await options.evaluate_all("elements => elements.map(element => element.dataset.value)")
         self.assertEqual(set(account_ids), set(ids))
-        self.assertEqual(account_ids[0], "gpt-4.1-mini")
+        self.assertEqual(account_ids[0], "gpt-6.1-sol")
 
     async def test_discovery_failure_does_not_replace_working_settings(self):
         await self.connect()
@@ -117,7 +117,7 @@ class ModelDiscoveryTest(PanelTestCase):
         await expect(self.panel.locator("#model-discovery-status")).to_contain_text("OpenAI denied model-list access (403)")
         self.assertNotIn("SECRET PROVIDER DETAIL", await self.panel.locator("body").inner_text())
         await self.panel.locator("#api-model").click()
-        await expect(self.panel.get_by_role("option", name="GPT-4.1 mini", exact=True)).to_be_visible()
+        await expect(self.panel.get_by_role("option", name="GPT-6.1 Sol", exact=True)).to_be_visible()
         await expect(self.panel.locator("#model-discovery-status")).to_contain_text("OpenAI denied model-list access (403)")
         self.assertGreaterEqual(count, 2)
         current = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
@@ -159,7 +159,7 @@ class ModelDiscoveryTest(PanelTestCase):
         async def respond(route):
             requests.append(route.request)
             await route.fulfill(json={"data": [
-                {"id": "gpt-4.1-mini", "created": 1},
+                {"id": "gpt-6.1-sol", "created": 1},
                 {"id": "gpt-5.5" if len(requests) == 1 else "gpt-6.1-sol", "created": 2},
             ]})
 
@@ -206,6 +206,9 @@ class ModelDiscoveryTest(PanelTestCase):
 
         await self.panel.route("https://api.openai.com/v1/models", respond)
         await expect(self.panel.locator("#api-key")).to_be_empty()
+        await expect(self.panel.locator("#api-model")).to_contain_text("GPT-6.1 Sol")
+        settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        self.assertEqual(settings["model"], "gpt-6.1-sol")
         await self.panel.locator("#api-model").click()
         options = self.panel.get_by_role("option")
         await expect(options).to_have_count(15)
@@ -217,7 +220,7 @@ class ModelDiscoveryTest(PanelTestCase):
             "gpt-5.4-nano", "gpt-5.2", "gpt-5-mini",
         }
         self.assertEqual(expected_aliases, set(ids))
-        self.assertEqual(ids[0], "gpt-4.1-mini")
+        self.assertEqual(ids[0], "gpt-6.1-sol")
         self.assertEqual(len(ids), len(set(ids)))
         for unsupported in ["gpt-3.5-turbo", "gpt-4", "gpt-4.5-preview", "codex-mini-latest",
                             "gpt-5.2-pro", "gpt-5.4-pro", "gpt-image-1", "gpt-audio", "gpt-oss-120b"]:
