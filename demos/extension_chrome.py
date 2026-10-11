@@ -17,6 +17,7 @@ async def prepare_extension(context: BrowserContext, profile: Path) -> Path:
     control_page = await open_group_control_page(context, EXTENSION_PATH)
     try:
         extension_id = await control_page.evaluate("() => chrome.runtime.id")
+        await control_page.evaluate("() => chrome.storage.local.set({developmentCompanion: true})")
         project = EXTENSION_PATH.parent
         return install_companion(extension_id, project, profile / "NativeMessagingHosts")
     finally:

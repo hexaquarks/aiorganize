@@ -67,7 +67,7 @@ class ExtensionPanelTest(PanelTestCase):
         await self.panel.evaluate("""async () => {
             const {panel} = await import('./panel-entry.js');
             const {mountPanel} = await import('./panel.js');
-            const {requestProposal} = await import('./proposal-client.js');
+            const {requestProposal} = await import('./companion-client.js');
             panel.destroy();
             mountPanel(document, request => requestProposal(request, {hostName: 'com.aiorganize.not_installed'}));
         }""")

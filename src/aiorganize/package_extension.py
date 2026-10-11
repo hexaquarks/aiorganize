@@ -16,6 +16,7 @@ PROJECT = Path(__file__).resolve().parents[2]
 EXTENSION_FILES = (
     "background.js", "manifest.json", "panel-entry.js", "panel.css", "panel.html",
     "panel.js", "proposal-client.js", "icons/16.png", "icons/32.png", "icons/48.png", "icons/128.png",
+    "page-reader.js", "settings.js",
 )
 
 
@@ -38,14 +39,24 @@ def build_zip(files: dict[str, bytes], tag: str, previous_versions: list[str]) -
     if any(current <= chrome_version(previous) for previous in previous_versions):
         raise ValueError("The release version must be greater than every previous release version.")
 
-    # Only terminal demos use debugger target IDs and control.html. The store panel uses native tab IDs.
-    manifest["permissions"] = [permission for permission in manifest["permissions"] if permission != "debugger"]
+    # Native messaging and debugger access belong only to the unpacked development build.
+    manifest["permissions"] = [
+        permission for permission in manifest["permissions"] if permission not in {"debugger", "nativeMessaging"}
+    ]
     output = io.BytesIO()
     with ZipFile(output, "w", compression=ZIP_STORED) as archive:
         for name in sorted(EXTENSION_FILES):
             data = files[name]
             if name == "manifest.json":
                 data = (json.dumps(manifest, indent=2) + "\n").encode()
+            if name == "panel-entry.js":
+                # The store entry point has no development routing or missing companion imports.
+                data = (
+                    'import {mountPanel} from "./panel.js";\n'
+                    'import {mountSettings} from "./settings.js";\n\n'
+                    'export const panel = mountPanel(document);\n'
+                    'await mountSettings(document);\n'
+                ).encode()
             entry = ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             entry.create_system = 3
             entry.external_attr = 0o100644 << 16

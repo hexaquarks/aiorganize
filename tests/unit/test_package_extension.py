@@ -29,6 +29,8 @@ class PackageExtensionTest(unittest.TestCase):
             self.assertEqual(archive.namelist(), sorted(EXTENSION_FILES))
             manifest = json.loads(archive.read("manifest.json"))
             self.assertNotIn("debugger", manifest["permissions"])
+            self.assertNotIn("nativeMessaging", manifest["permissions"])
+            self.assertNotIn(b"companion", archive.read("panel-entry.js"))
             self.assertEqual(manifest["version"], "0.1.0")
             for icon in manifest["icons"].values():
                 self.assertTrue(archive.read(icon).startswith(b"\x89PNG\r\n\x1a\n"))

@@ -15,6 +15,25 @@
         <h1>Less clutter.<br>More focus.</h1>
         <p class="intro">A place for every tab.</p>
       </header>
+      <details id="settings">
+        <summary>API settings</summary>
+        <form id="api-settings">
+          <label for="api-key">OpenAI API key</label>
+          <input id="api-key" type="password" autocomplete="off" spellcheck="false">
+          <label for="api-model">Model</label>
+          <input id="api-model" type="text" value="gpt-4.1-mini" autocomplete="off" spellcheck="false">
+          <label class="remember"><input id="remember-key" type="checkbox">Remember key on this device</label>
+          <p class="settings-note">Otherwise the key lasts until Chrome restarts. Remembered keys are stored locally
+            without encryption and are never synced.</p>
+          <div class="settings-actions">
+            <button type="submit" class="secondary">Save settings</button>
+            <button id="forget-key" type="button" class="secondary">Forget key</button>
+          </div>
+          <p id="settings-status" aria-live="polite"></p>
+        </form>
+      </details>
+      <p class="settings-note">Organize sends tab titles, URLs, and inspected page text to OpenAI.
+        API charges may apply.</p>
       <button id="organize" type="button">
         <span aria-hidden="true">✦</span><span id="organize-label">Organize tabs</span>
       </button>
