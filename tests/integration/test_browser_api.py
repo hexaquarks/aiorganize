@@ -55,7 +55,7 @@ class BrowserApiTest(PanelTestCase):
         self.assertNotIn("debugger", manifest["permissions"])
         self.assertNotIn("nativeMessaging", manifest["permissions"])
         self.assertNotIn("scripting", manifest["permissions"])
-        self.assertEqual(manifest["host_permissions"], ["https://api.openai.com/*"])
+        self.assertEqual(manifest["host_permissions"], ["https://api.openai.com/*", "https://*.cloud.qdrant.io/*"])
         self.assertFalse((self.extension_path / "control.html").exists())
         self.assertFalse((self.extension_path / "companion-client.js").exists())
         self.assertFalse((self.extension_path / "page-reader.js").exists())

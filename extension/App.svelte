@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount, tick } from "svelte";
 	import { ConnectionState } from "./connection.svelte";
+	import { QdrantConnectionState } from "./qdrant-connection.svelte";
+	import QdrantSettings from "./components/QdrantSettings.svelte";
 	import { GroupingState } from "./grouping.svelte";
 	import SettingsForm from "./components/SettingsForm.svelte";
 	import ReadyPanel from "./components/ReadyPanel.svelte";
@@ -9,12 +11,15 @@
 
 	const connection = new ConnectionState();
 	const grouping = new GroupingState();
+	const qdrant = new QdrantConnectionState();
 
 	onMount(() => {
 		void connection.load();
+		void qdrant.load();
 		const stopWatching = grouping.watch();
 		return () => {
 			connection.destroy();
+			qdrant.destroy();
 			stopWatching();
 		};
 	});
@@ -44,7 +49,7 @@
 			id="settings-toggle"
 			class="text-button muted"
 			type="button"
-			disabled={grouping.busy || connection.testing}
+			disabled={grouping.busy || connection.testing || qdrant.testing}
 			onclick={editConnection}><Icon name="settings" /> Settings</button
 		>
 	</header>
@@ -57,6 +62,7 @@
 	</div>
 	<SettingsForm {connection} />
 	<ReadyPanel {connection} {grouping} onedit={editConnection} />
+	<QdrantSettings connection={qdrant} visible={connection.editing} />
 	<p id="privacy-note" class="privacy-note">
 		<Icon name="privacy" />
 		<span>Organizing sends tab titles and URLs to OpenAI.<br />Your data is only used to group your tabs.</span>

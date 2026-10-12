@@ -1,4 +1,4 @@
-import type { Connection } from "./types";
+import type { Connection, QdrantConnection } from "./types";
 
 import { SUPPORTED_MODELS } from "./model-catalog";
 
@@ -53,4 +53,29 @@ export async function clearKey() {
 	await restrictStorage();
 	await chrome.storage.session.remove(["connection", "apiKey"]);
 	await chrome.storage.local.remove(["connection", "apiKey", "model"]);
+}
+
+export async function getQdrantSettings(): Promise<QdrantConnection> {
+	await restrictStorage();
+	const local = await chrome.storage.local.get<{ qdrant?: Omit<QdrantConnection, "remember"> }>("qdrant");
+	const session = await chrome.storage.session.get<{ qdrant?: Omit<QdrantConnection, "remember"> }>("qdrant");
+	const connection = session.qdrant || local.qdrant;
+	return connection
+		? { ...connection, remember: !session.qdrant }
+		: { url: "", apiKey: "", remember: false, verifiedAt: null };
+}
+
+export async function saveQdrantSettings({ url, apiKey, remember, verifiedAt }: QdrantConnection) {
+	await restrictStorage();
+	if (!url || !apiKey || !verifiedAt) throw new Error("Test the Qdrant connection before saving it.");
+	const target = remember ? chrome.storage.local : chrome.storage.session;
+	const other = remember ? chrome.storage.session : chrome.storage.local;
+	await target.set({ qdrant: { url, apiKey, verifiedAt } });
+	await other.remove("qdrant");
+}
+
+export async function clearQdrantSettings() {
+	await restrictStorage();
+	await chrome.storage.session.remove("qdrant");
+	await chrome.storage.local.remove("qdrant");
 }
