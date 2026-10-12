@@ -170,6 +170,10 @@ test("reusing a collection and retrying a save does not create duplicate identit
 	});
 
 	const first = await store().saveGroups([group]);
+
+	// Preserve IDs produced before switching to the UUID package.
+	assert.equal(first[0], "0e6d2b7b-9e48-551e-bfe5-a204bbf0c23a");
+
 	const retry = await store().saveGroups([
 		{ ...group, pages: [...group.pages].reverse(), approvedAt: "2026-10-13T00:00:00Z" },
 	]);
