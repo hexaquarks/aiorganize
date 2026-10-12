@@ -7,7 +7,9 @@ import { embedTexts, EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "./embeddings"
 import { normalizeQdrantUrl } from "./qdrant";
 import { hasStatus, isRecord, runVectorRequest, validateApiKey } from "./vector-requests";
 
-export const SAVED_GROUPINGS_COLLECTION = "aiorganize_groups_v1_text_embedding_3_small_1536";
+const USER_COLLECTION = "aiorganize_groups_v1_text_embedding_3_small_1536";
+export const SAVED_GROUPINGS_COLLECTION =
+	import.meta.env.MODE === "qdrant-test" ? `${USER_COLLECTION}_test` : USER_COLLECTION;
 const SCHEMA_VERSION = 1;
 const SAVED_GROUPINGS_INDEXES = [
 	{ field_name: "schemaVersion", field_schema: "integer" },

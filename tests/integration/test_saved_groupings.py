@@ -155,7 +155,7 @@ class SavedGroupingsTest(PanelTestCase):
         await self.organize()
         await self.approve()
 
-        await expect(self.panel.locator("#saved-groupings-status")).to_contain_text("Qdrant isn’t connected")
+        await expect(self.panel.locator("#saved-groupings-status")).to_be_hidden()
         await expect(self.panel.locator("#status")).to_have_text("Your tabs are organized.")
         self.assertEqual(self.embedding_requests, [])
         self.assertEqual(self.database_requests, [])

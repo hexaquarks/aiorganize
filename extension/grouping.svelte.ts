@@ -163,16 +163,19 @@ export class GroupingState {
 		}
 
 		this.canRetrySave = false;
-		this.savedGroupingsStatus = "Saving approved groupings…";
+		this.savedGroupingsStatus = "";
 
 		try {
 			const qdrant = await getQdrantSettings();
 
 			if (!qdrant.verifiedAt) {
 				this.groupsToSave = null;
-				this.savedGroupingsStatus = "Groupings weren’t saved because Qdrant isn’t connected.";
+				console.debug("Skipping saved groupings: Qdrant has no verified connection.");
+
 				return;
 			}
+
+			this.savedGroupingsStatus = "Saving approved groupings…";
 
 			const openai = await getSettings();
 

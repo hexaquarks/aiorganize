@@ -4,7 +4,7 @@
 	"type": "module",
 	"scripts": {
 		"build": "vite build",
-		"dev": "vite build --watch",
+		"dev": "vite build --watch --mode development",
 		"check": "svelte-check --tsconfig ./tsconfig.json",
 		"format": "prettier --write extension 'tests/**/*.{ts,mjs}' vite.config.ts vitest.config.ts svelte.config.js tsconfig.json package.json .prettierrc.json",
 		"format:check": "prettier --check extension 'tests/**/*.{ts,mjs}' vite.config.ts vitest.config.ts svelte.config.js tsconfig.json package.json .prettierrc.json",

@@ -1,4 +1,4 @@
-.PHONY: dev dev-isolated build test store-status
+.PHONY: dev dev-isolated build test test-qdrant store-status
 
 dev:
 	uv run python -m src.dev
@@ -17,3 +17,7 @@ test:
 	npm run build
 	npm test
 	uv run python -m unittest discover -s tests
+
+test-qdrant:
+	npm run build -- --mode qdrant-test
+	QDRANT_LIVE_TEST=1 uv run python -m unittest tests.integration.test_live_qdrant
