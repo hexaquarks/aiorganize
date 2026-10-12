@@ -62,11 +62,13 @@ test("failed verification is logged and never saved as a working connection", as
 	vi.stubEnv("QDRANT_ENDPOINT", connection.url);
 	vi.stubEnv("QDRANT_API_KEY", connection.apiKey);
 	vi.mocked(getQdrantSettings).mockResolvedValue({ ...connection, verifiedAt: null });
-	vi.mocked(testQdrantConnection).mockRejectedValue(new Error("Key rejected."));
+	vi.mocked(testQdrantConnection).mockRejectedValue(new Error("provider-secret test-key"));
 	const warning = vi.spyOn(console, "warn").mockImplementation(() => {});
 
 	await expect(loadDevSettings()).resolves.toBeUndefined();
 
 	expect(saveQdrantSettings).not.toHaveBeenCalled();
-	expect(warning).toHaveBeenCalledWith("Development Qdrant setup failed: Key rejected.");
+	expect(warning).toHaveBeenCalledWith(
+		"Development Qdrant setup failed. Check the endpoint, database key, and network.",
+	);
 });

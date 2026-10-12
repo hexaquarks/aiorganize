@@ -57,6 +57,7 @@ export async function requestProposal({
 	try {
 		requestSignal.throwIfAborted();
 		onProgress("Finding the best groups…");
+
 		const input = proposalInput(snapshot, savedGroupings);
 		let instructions = INSTRUCTIONS;
 

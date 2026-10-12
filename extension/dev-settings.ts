@@ -26,9 +26,7 @@ export async function loadDevSettings() {
 		await saveQdrantSettings(verified);
 
 		console.debug("Development Qdrant connection verified from .env.");
-	} catch (error) {
-		const message = error instanceof Error ? error.message : "Connection setup failed.";
-
-		console.warn(`Development Qdrant setup failed: ${message}`);
+	} catch {
+		console.warn("Development Qdrant setup failed. Check the endpoint, database key, and network.");
 	}
 }
