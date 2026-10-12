@@ -6,8 +6,9 @@
 		"build": "vite build",
 		"dev": "vite build --watch",
 		"check": "svelte-check --tsconfig ./tsconfig.json",
-		"format": "prettier --write extension vite.config.ts svelte.config.js tsconfig.json package.json .prettierrc.json",
-		"format:check": "prettier --check extension vite.config.ts svelte.config.js tsconfig.json package.json .prettierrc.json"
+		"format": "prettier --write extension 'tests/**/*.{ts,mjs}' vite.config.ts vitest.config.ts svelte.config.js tsconfig.json package.json .prettierrc.json",
+		"format:check": "prettier --check extension 'tests/**/*.{ts,mjs}' vite.config.ts vitest.config.ts svelte.config.js tsconfig.json package.json .prettierrc.json",
+		"test": "vitest run"
 	},
 	"devDependencies": {
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
@@ -20,9 +21,20 @@
 		"svelte-check": "^4.7.6",
 		"tailwindcss": "^4.3.3",
 		"typescript": "^6.0.3",
-		"vite": "^8.3.4"
+		"vite": "^8.3.4",
+		"vitest": "^5.0.4"
 	},
 	"engines": {
 		"node": ">=22.12.0"
+	},
+	"dependencies": {
+		"@qdrant/js-client-rest": "^1.19.0",
+		"openai": "^7.32.0",
+		"uuid": "^14.0.3"
+	},
+	"overrides": {
+		"@qdrant/js-client-rest": {
+			"undici": "^7.29.1"
+		}
 	}
 }
