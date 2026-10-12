@@ -1,6 +1,9 @@
 import { requestProposal } from "./llm";
 import { validateProposal } from "./proposal";
 import { applyGroups, getTabState } from "./tabs";
+import { getQdrantSettings, getSettings } from "./settings";
+import { GroupingVectorStore } from "./vector-store";
+import type { ApprovedGroup } from "./vector-store";
 import type { PendingProposal } from "./types";
 
 export class GroupingState {
@@ -8,8 +11,11 @@ export class GroupingState {
 	busy = $state(false);
 	tabCount = $state(0);
 	status = $state("");
+	savedGroupingsStatus = $state("");
+	canRetrySave = $state(false);
 
 	private controller = new AbortController();
+	private groupsToSave: ApprovedGroup[] | null = null;
 
 	async refreshCount() {
 		const window = await chrome.windows.getCurrent();
@@ -19,7 +25,14 @@ export class GroupingState {
 	}
 
 	async organize() {
+		if (this.busy) {
+			return;
+		}
+
 		this.pending = null;
+		this.groupsToSave = null;
+		this.savedGroupingsStatus = "";
+		this.canRetrySave = false;
 		this.busy = true;
 		this.status = "Reading this window’s tabs…";
 
@@ -65,22 +78,83 @@ export class GroupingState {
 	}
 
 	async approve() {
-		if (!this.pending) {
+		if (!this.pending || this.busy) {
 			return;
 		}
 
 		this.busy = true;
 		this.status = "Applying approved groups…";
+		const proposal = this.pending;
 
 		try {
-			await applyGroups(this.pending);
+			await applyGroups(proposal);
 
 			this.status = "Your tabs are organized.";
+			this.pending = null;
+			this.groupsToSave = approvedGroupings(proposal);
+
+			await this.saveGroupings();
 		} catch (error) {
 			this.status = error instanceof Error ? error.message : "Could not apply groups.";
 		} finally {
 			this.pending = null;
 			this.busy = false;
+		}
+	}
+
+	async retrySave() {
+		if (this.busy || !this.canRetrySave || !this.groupsToSave) {
+			return;
+		}
+
+		this.busy = true;
+
+		try {
+			await this.saveGroupings();
+		} finally {
+			this.busy = false;
+		}
+	}
+
+	private async saveGroupings() {
+		if (!this.groupsToSave) {
+			return;
+		}
+
+		this.canRetrySave = false;
+		this.savedGroupingsStatus = "Saving approved groupings…";
+
+		try {
+			const qdrant = await getQdrantSettings();
+
+			if (!qdrant.verifiedAt) {
+				this.groupsToSave = null;
+				this.savedGroupingsStatus = "Groupings weren’t saved because Qdrant isn’t connected.";
+				return;
+			}
+
+			const openai = await getSettings();
+
+			if (!openai.verifiedAt) {
+				throw new Error("Connect OpenAI to save approved groupings.");
+			}
+
+			const store = new GroupingVectorStore(qdrant, openai.apiKey);
+
+			await store.saveGroups(this.groupsToSave, this.controller.signal);
+
+			this.groupsToSave = null;
+			this.savedGroupingsStatus = "Approved groupings saved.";
+		} catch (error) {
+			if (this.controller.signal.aborted) {
+				return;
+			}
+
+			// Keep this failure separate from Chrome application, which already completed.
+			const message = error instanceof Error ? error.message : "Could not save approved groupings.";
+
+			this.savedGroupingsStatus = `Groupings weren’t saved. ${message}`;
+			this.canRetrySave = true;
 		}
 	}
 
@@ -96,4 +170,16 @@ export class GroupingState {
 			events.forEach((event) => event.removeListener(refresh));
 		};
 	}
+}
+
+function approvedGroupings(proposal: PendingProposal): ApprovedGroup[] {
+	// Chrome application already validated every proposed ID against this snapshot.
+	const pages = new Map(proposal.snapshot.map(({ id, title, url }) => [id, { title, url }]));
+	const approvedAt = new Date().toISOString();
+
+	return proposal.groups.map((group) => ({
+		name: group.name,
+		pages: group.tab_ids.map((id) => pages.get(id)!),
+		approvedAt,
+	}));
 }

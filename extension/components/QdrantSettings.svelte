@@ -35,7 +35,7 @@
 				<strong>Qdrant Cloud</strong>
 				<a href="https://cloud.qdrant.io" target="_blank" rel="noreferrer">Open dashboard ↗</a>
 			</div>
-			<p class="note">Optional database connection for saved groupings.</p>
+			<p class="note">When connected, approved group names, tab titles, and URLs are saved here.</p>
 			<label for="qdrant-url">Cluster URL</label>
 			<input
 				id="qdrant-url"
