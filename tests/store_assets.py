@@ -1,6 +1,8 @@
 """Render store artwork and an actual panel preview using offline sample tabs."""
 
 import asyncio
+import base64
+import json
 import tempfile
 from pathlib import Path
 
@@ -11,32 +13,21 @@ from tests.fixtures import EXTENSION_PATH, create_test_tabs
 
 
 STORE = Path(__file__).resolve().parents[1] / "store"
-ICON = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
-  <rect x="16" y="16" width="96" height="96" rx="24" fill="#6558e8"/>
-  <rect x="33" y="38" width="27" height="52" rx="7" fill="#ffffff"/>
-  <rect x="68" y="38" width="27" height="23" rx="7" fill="#d5d0ff"/>
-  <rect x="68" y="69" width="27" height="21" rx="7" fill="#a7ead7"/>
-</svg>"""
 
 
 async def main() -> None:
-    icons = EXTENSION_PATH / "icons"
-    icons.mkdir(exist_ok=True)
     STORE.mkdir(exist_ok=True)
+    icon = base64.b64encode((EXTENSION_PATH / "icons/brand.png").read_bytes()).decode()
     async with async_playwright() as playwright:
         browser = await playwright.chromium.launch(channel="chrome", headless=True)
         try:
             page = await browser.new_page(device_scale_factor=1)
-            for size in (16, 32, 48, 128):
-                await page.set_viewport_size({"width": size, "height": size})
-                await page.set_content('<style>body{margin:0;background:transparent}</style>' + ICON)
-                await page.screenshot(path=str(icons / f"{size}.png"), omit_background=True)
-
             await page.set_viewport_size({"width": 440, "height": 280})
-            await page.set_content('''<style>
-                body{margin:0;background:#25204f;display:grid;place-items:center;height:100vh}
-                svg{width:240px;height:240px}
-                </style>''' + ICON)
+            await page.set_content(f'''<style>
+                body{{margin:0;background:#25204f;display:grid;place-items:center;height:100vh}}
+                img{{width:240px;height:240px;object-fit:contain}}
+                </style><img src="data:image/png;base64,{icon}" alt="">''')
+            await page.locator("img").evaluate("image => image.decode()")
             await page.screenshot(path=str(STORE / "promo-440x280.png"))
         finally:
             await browser.close()
@@ -46,23 +37,40 @@ async def main() -> None:
                 profile, channel="chrome", headless=True, args=CHROME_ARGS,
                 ignore_default_args=["--disable-extensions"],
                 viewport={"width": 1280, "height": 800}, device_scale_factor=1, color_scheme="light",
+                reduced_motion="reduce",
             )
             try:
                 extension_id = await load_extension(context, EXTENSION_PATH)
                 await create_test_tabs(context)
                 panel = await context.new_page()
+                # Exercise the real connection and grouping UI with offline API responses.
+                await panel.route("https://api.openai.com/v1/models", lambda route: route.fulfill(json={
+                    "data": [],
+                }))
+
+                async def respond(route):
+                    tabs = json.loads(route.request.post_data_json["input"])["tabs"]
+                    categories = {
+                        "Python Tutorial": "Dev", "LangChain Docs": "Dev", "ChatGPT": "AI",
+                        "Pasta Recipes": "Cooking", "Toronto Travel Guide": "Travel",
+                    }
+                    groups = {}
+                    for tab in tabs:
+                        category = categories.get(tab["title"], "Other")
+                        groups.setdefault(category, []).append(tab["id"])
+                    proposal = {"groups": [
+                        {"name": name, "tab_ids": ids} for name, ids in groups.items()
+                    ]}
+                    await route.fulfill(json={"status": "completed", "output": [{"content": [{
+                        "type": "output_text", "text": json.dumps(proposal),
+                    }]}]})
+
+                await panel.route("https://api.openai.com/v1/responses", respond)
                 await panel.goto(f"chrome-extension://{extension_id}/panel.html")
-                # Use the real UI with a deterministic proposal; no API call or personal tabs are captured.
-                await panel.evaluate("""async () => {
-                    const {panel, mountPanel} = await import('./panel.js');
-                    panel.destroy();
-                    mountPanel(document, async ({snapshot}) => ({groups: [
-                        {name: 'Dev', tab_ids: snapshot.slice(0, 2).map(tab => tab.id)},
-                        {name: 'Cooking', tab_ids: [snapshot[2].id, snapshot[4].id]},
-                        {name: 'Travel', tab_ids: [snapshot[3].id, snapshot[5].id]},
-                    ]}));
-                }""")
-                await panel.get_by_role("button", name="Organize tabs", exact=True).click()
+                await panel.locator("#api-key").fill("offline-preview-key")
+                await panel.locator("#test-connection").click()
+                await expect(panel.locator("#ready")).to_be_visible()
+                await panel.locator("#organize").click()
                 await expect(panel.locator("#preview")).to_be_visible()
                 await panel.screenshot(path=str(STORE / "preview-1280x800.png"))
             finally:

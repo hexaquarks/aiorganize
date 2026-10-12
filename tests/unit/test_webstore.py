@@ -7,7 +7,7 @@ from urllib.parse import parse_qs
 
 from src import webstore
 from src.build import EXTENSION_FILES, PROJECT
-from src.webstore import WebStoreClient, release, request_json, store_versions
+from src.webstore import WebStoreClient, release, store_versions
 
 
 PRIVATE_STATUS = {
@@ -91,7 +91,7 @@ class WebStoreTest(unittest.TestCase):
             "CWS_REFRESH_TOKEN": "test-refresh",
         }
         with patch.dict(webstore.os.environ, environment, clear=True):
-            with patch.object(webstore, "request_json", side_effect=[
+            with patch.object(webstore, "_request_json", side_effect=[
                 {"access_token": "test-token"}, PRIVATE_STATUS,
                 {"uploadState": "SUCCEEDED"}, {"state": "PENDING_REVIEW"},
             ]) as request:
@@ -115,7 +115,7 @@ class WebStoreTest(unittest.TestCase):
 
     def test_async_upload_is_polled_and_failure_or_timeout_is_not_success(self):
         client = object.__new__(WebStoreClient)
-        client.request = Mock(return_value={"uploadState": "IN_PROGRESS"})
+        client._request = Mock(return_value={"uploadState": "IN_PROGRESS"})
         client.status = Mock(return_value={"lastAsyncUploadState": "SUCCEEDED"})
         with patch.object(webstore.time, "sleep"):
             client.upload(b"ZIP")
@@ -134,7 +134,7 @@ class WebStoreTest(unittest.TestCase):
         error = HTTPError(webstore.TOKEN_URL, 400, "test-secret", {}, io.BytesIO(b"test-refresh"))
         with patch.object(webstore, "urlopen", side_effect=error):
             with self.assertRaises(ValueError) as raised:
-                request_json(webstore.Request(webstore.TOKEN_URL))
+                webstore._request_json(webstore.Request(webstore.TOKEN_URL))
         self.assertNotIn("test-secret", str(raised.exception))
         self.assertNotIn("test-refresh", str(raised.exception))
 

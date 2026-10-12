@@ -2,7 +2,7 @@ import {SUPPORTED_MODELS} from "./model-catalog.js";
 import {fetchModels, ModelListError} from "./models.js";
 import {mountModelPicker} from "./model-picker.js";
 
-export const DEFAULT_MODEL = SUPPORTED_MODELS[0].id;
+const DEFAULT_MODEL = SUPPORTED_MODELS[0].id;
 
 async function restrictStorage() {
   await chrome.storage.local.setAccessLevel({accessLevel: "TRUSTED_CONTEXTS"});
@@ -30,7 +30,7 @@ export async function getSettings() {
   };
 }
 
-export async function saveSettings({apiKey, model, remember, verifiedAt}) {
+async function saveSettings({apiKey, model, remember, verifiedAt}) {
   await restrictStorage();
   if (!apiKey || !verifiedAt) throw new Error("Test the connection before saving it.");
   const connection = {apiKey, model, verifiedAt};
@@ -43,7 +43,7 @@ export async function saveSettings({apiKey, model, remember, verifiedAt}) {
   await chrome.storage.local.remove(["apiKey", "model"]);
 }
 
-export async function clearKey() {
+async function clearKey() {
   await restrictStorage();
   await chrome.storage.session.remove(["connection", "apiKey"]);
   await chrome.storage.local.remove(["connection", "apiKey", "model"]);

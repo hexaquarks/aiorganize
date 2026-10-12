@@ -29,7 +29,7 @@ Upload the icon, 440x280 promo image, and 1280x800 screenshot separately.
 Review instructions: install the extension, open API settings, enter an OpenAI API key, and select
 a model the account can use. Generate, reject, and approve proposals on sample tabs. The release
 needs no Python, companion, terminal, or checkout. Never include credentials in the ZIP or listing.
-Run make dev to open a dedicated Chrome profile with the source extension. Add the API key in the
+Run make dev for local setup, or make dev-isolated for a separate development Chrome profile. Add the API key in the
 extension settings, as in the release. Reload the extension after edits; development needs no ZIP.
 
 Owner-only distribution
@@ -51,7 +51,7 @@ Pending verification after authorized private publication
 4. After a separately authorized higher-version release to the SAME private item, allow Chrome to
    update (or use chrome://extensions > Developer mode > Update). Confirm the installed version rises,
    the extension ID stays the same, stored settings remain available, and existing groups remain intact.
-5. Record actual results before closing issue #4. Local ZIP tests do not prove store access or updates.
+5. Record actual results after verification. Local ZIP tests do not prove store access or updates.
 
 Automating updates after the initial private publication
 

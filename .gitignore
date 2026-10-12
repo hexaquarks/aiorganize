@@ -5,3 +5,17 @@ __pycache__/
 .env
 .env.*
 dist/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+*.pem
+*.key
+*.crx

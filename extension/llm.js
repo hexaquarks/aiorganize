@@ -103,7 +103,7 @@ export async function requestProposal({snapshot, signal, onProgress = () => {}, 
   }
 }
 
-export class ConnectionError extends Error {
+class ConnectionError extends Error {
   constructor(kind, message, action) {
     super(message);
     this.kind = kind;
