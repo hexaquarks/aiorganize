@@ -16,7 +16,9 @@
 	onMount(() => {
 		void connection.load();
 		void qdrant.load();
+
 		const stopWatching = grouping.watch();
+
 		return () => {
 			connection.destroy();
 			qdrant.destroy();
@@ -27,18 +29,37 @@
 	function editConnection() {
 		grouping.pending = null;
 		grouping.status = "";
+
 		connection.edit();
 	}
 
 	$effect(() => {
-		const target = grouping.pending ? "preview" : grouping.status ? "status" : null;
-		if (target)
-			void tick().then(() =>
-				document.getElementById(target)?.scrollIntoView({
-					block: "start",
-					behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
-				}),
-			);
+		let target: string | null = null;
+
+		if (grouping.pending) {
+			target = "preview";
+		} else if (grouping.status) {
+			target = "status";
+		}
+
+		if (!target) {
+			return;
+		}
+
+		void tick().then(() => {
+			const section = document.getElementById(target);
+
+			if (!section) {
+				return;
+			}
+
+			const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+			section.scrollIntoView({
+				block: "start",
+				behavior: reducedMotion ? "instant" : "smooth",
+			});
+		});
 	});
 </script>
 

@@ -1,5 +1,6 @@
 <script lang="ts">
 	let { name }: { name: "settings" | "privacy" | "trash" } = $props();
+
 	const paths = {
 		settings:
 			"m9 3-.6 2.3-2 .9L4 5.6 2 9l1.8 1.6v2.8L2 15l2 3.4 2.4-.6 2 .9L9 21h6l.6-2.3 2-.9 2.4.6 2-3.4-1.8-1.6v-2.8L22 9l-2-3.4-2.4.6-2-.9L15 3Z",
@@ -10,5 +11,7 @@
 
 <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
 	<path d={paths[name]} />
-	{#if name === "settings"}<circle cx="12" cy="12" r="3" />{/if}
+	{#if name === "settings"}
+		<circle cx="12" cy="12" r="3" />
+	{/if}
 </svg>

@@ -6,26 +6,36 @@
 	let revealed = $state(false);
 	let keyInput: HTMLInputElement;
 	let form: HTMLFormElement;
+
 	const discovery = $derived(connection.discovery);
 	const modelNote = $derived(discovery.models.find((item) => item.id === connection.draft.model)?.note);
 
 	$effect(() => {
-		if (connection.editing) revealed = false;
+		if (connection.editing) {
+			revealed = false;
+		}
 	});
 
 	function keyChanged() {
 		connection.feedback = null;
+
 		discovery.schedule(connection.draft.apiKey, connection.draft.model);
 	}
 
 	function refresh(force = false) {
-		if (!connection.testing) void discovery.refresh(connection.draft.apiKey, connection.draft.model, force);
+		if (!connection.testing) {
+			void discovery.refresh(connection.draft.apiKey, connection.draft.model, force);
+		}
 	}
 
 	function retry() {
-		if (connection.feedback?.kind === "auth") keyInput.focus();
-		else if (connection.feedback?.kind === "model") form.querySelector<HTMLButtonElement>("#api-model")?.focus();
-		else void connection.verify();
+		if (connection.feedback?.kind === "auth") {
+			keyInput.focus();
+		} else if (connection.feedback?.kind === "model") {
+			form.querySelector<HTMLButtonElement>("#api-model")?.focus();
+		} else {
+			void connection.verify();
+		}
 	}
 </script>
 

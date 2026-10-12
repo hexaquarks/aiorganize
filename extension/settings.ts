@@ -17,9 +17,11 @@ async function restrictStorage() {
 
 export async function getSettings(): Promise<Connection> {
 	await restrictStorage();
+
 	const local = await chrome.storage.local.get<StoredSettings>(["connection", "apiKey", "model"]);
 	const session = await chrome.storage.session.get<StoredSettings>(["connection", "apiKey"]);
 	const connection = session.connection || local.connection;
+
 	if (connection) {
 		return {
 			...connection,
@@ -27,6 +29,7 @@ export async function getSettings(): Promise<Connection> {
 			remember: !session.connection,
 		};
 	}
+
 	// Keep legacy keys, but discard unverified model preferences so setup uses the current default.
 	return {
 		apiKey: session.apiKey || local.apiKey || "",
@@ -38,10 +41,15 @@ export async function getSettings(): Promise<Connection> {
 
 export async function saveSettings({ apiKey, model, remember, verifiedAt }: Connection) {
 	await restrictStorage();
-	if (!apiKey || !verifiedAt) throw new Error("Test the connection before saving it.");
+
+	if (!apiKey || !verifiedAt) {
+		throw new Error("Test the connection before saving it.");
+	}
+
 	const connection = { apiKey, model, verifiedAt };
 	const target = remember ? chrome.storage.local : chrome.storage.session;
 	const other = remember ? chrome.storage.session : chrome.storage.local;
+
 	// One record keeps the tested key, model, and verification time together.
 	await target.set({ connection });
 	await other.remove("connection");
@@ -51,6 +59,7 @@ export async function saveSettings({ apiKey, model, remember, verifiedAt }: Conn
 
 export async function clearKey() {
 	await restrictStorage();
+
 	await chrome.storage.session.remove(["connection", "apiKey"]);
 	await chrome.storage.local.remove(["connection", "apiKey", "model"]);
 }

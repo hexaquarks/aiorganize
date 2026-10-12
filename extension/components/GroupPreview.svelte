@@ -13,6 +13,7 @@
 		onapprove: () => void;
 		onreject: () => void;
 	} = $props();
+
 	const tabs = $derived(new Map(pending?.snapshot.map((tab) => [tab.id, tab]) || []));
 
 	function siteLabel(url: string) {

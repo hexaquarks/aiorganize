@@ -13,14 +13,19 @@ const GROUP_COLORS: { name: `${chrome.tabGroups.Color}`; hex: string }[] = [
 
 // Share the palette so preview colors describe the groups Chrome will actually apply.
 export function groupColor(name: string, index: number): { name: `${chrome.tabGroups.Color}`; hex: string } {
-	return name.toLowerCase() === "other"
-		? { name: "grey", hex: "#737b89" }
-		: GROUP_COLORS[index % GROUP_COLORS.length];
+	if (name.toLowerCase() === "other") {
+		return { name: "grey", hex: "#737b89" };
+	}
+
+	return GROUP_COLORS[index % GROUP_COLORS.length];
 }
 
 export async function getTabState() {
-	const tabs = (await chrome.tabs.query({})).filter((tab) => !tab.url?.startsWith(chrome.runtime.getURL("")));
+	const allTabs = await chrome.tabs.query({});
+	const extensionUrl = chrome.runtime.getURL("");
+	const tabs = allTabs.filter((tab) => !tab.url?.startsWith(extensionUrl));
 	const groups = await chrome.tabGroups.query({});
+
 	return {
 		tabs: tabs
 			.filter((tab) => tab.id !== undefined)
@@ -48,62 +53,80 @@ export async function applyGroups({ groups, snapshot, window_id }: PendingPropos
 	const byId = new Map(before.tabs.map((tab) => [tab.id, tab]));
 	const expectedIds = new Set(snapshot.map((tab) => tab.id));
 	const proposedIds = groups.flatMap((group) => group.tab_ids);
-	if (
-		new Set(proposedIds).size !== proposedIds.length ||
-		proposedIds.length !== expectedIds.size ||
-		proposedIds.some((id) => !expectedIds.has(id))
-	) {
+
+	const hasDuplicateIds = new Set(proposedIds).size !== proposedIds.length;
+	const hasWrongTabCount = proposedIds.length !== expectedIds.size;
+	const hasUnknownIds = proposedIds.some((id) => !expectedIds.has(id));
+
+	if (hasDuplicateIds || hasWrongTabCount || hasUnknownIds) {
 		throw new Error("Proposal has duplicate, missing, or invented tab IDs.");
 	}
 
 	// Validate the entire proposal before the first mutation, including navigation changes.
 	for (const expected of snapshot) {
 		const current = byId.get(expected.id);
+
 		if (!current || current.url !== expected.url || current.title !== expected.title) {
 			throw new Error("Tabs changed after preview. Generate and review a new proposal.");
 		}
 	}
+
 	const windows = new Set(snapshot.map((tab) => byId.get(tab.id)!.window_id));
+
 	if (windows.size !== 1) {
 		throw new Error("Organize one browser window at a time.");
 	}
+
 	const windowId = [...windows][0];
+
 	if (window_id != null && windowId !== window_id) {
 		throw new Error("The selected Chrome window changed. Generate and review a new proposal.");
 	}
+
 	const windowTabs = before.tabs.filter((tab) => tab.window_id === windowId);
+
 	if (windowTabs.length !== snapshot.length) {
 		throw new Error("Tabs were added after preview. Generate and review a new proposal.");
 	}
 
 	const applied = [];
 	let otherGroupId;
+
 	try {
 		for (const [index, group] of groups.entries()) {
 			const tabIds = group.tab_ids.map((id) => byId.get(id)!.chrome_id);
-			if (!tabIds.length) throw new Error("Cannot apply an empty group.");
+
+			if (!tabIds.length) {
+				throw new Error("Cannot apply an empty group.");
+			}
+
 			const groupId = await chrome.tabs.group({
 				tabIds: tabIds as [number, ...number[]],
 				createProperties: { windowId },
 			});
+
 			applied.push(group.name);
 			await chrome.tabGroups.update(groupId, {
 				title: group.name,
 				color: groupColor(group.name, index).name as chrome.tabGroups.Color,
 				collapsed: false,
 			});
+
 			if (group.name.toLowerCase() === "other") {
 				otherGroupId = groupId;
 			}
 		}
+
 		if (otherGroupId !== undefined) {
 			await chrome.tabGroups.move(otherGroupId, { index: -1 });
 		}
 	} catch (error) {
 		// Browser mutations are not transactional; report partial work instead of claiming success.
-		throw new Error(
-			`Application stopped; groups already started: ${applied.join(", ")}. ${error instanceof Error ? error.message : "Chrome request failed."}`,
-		);
+		const startedGroups = applied.join(", ");
+		const reason = error instanceof Error ? error.message : "Chrome request failed.";
+
+		throw new Error(`Application stopped; groups already started: ${startedGroups}. ${reason}`);
 	}
+
 	return await getTabState();
 }
