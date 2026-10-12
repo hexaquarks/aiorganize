@@ -1,10 +1,11 @@
 import type { QdrantConnection } from "./types";
 
 import { v5 as uuidv5 } from "uuid";
+import { QdrantClient } from "@qdrant/js-client-rest";
 
 import { embedTexts, EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "./embeddings";
 import { normalizeQdrantUrl } from "./qdrant";
-import { isRecord, requestVectorJson, validateApiKey } from "./vector-http";
+import { hasStatus, isRecord, runVectorRequest, validateApiKey } from "./vector-requests";
 
 export const SAVED_GROUPINGS_COLLECTION = "aiorganize_groups_v1_text_embedding_3_small_1536";
 const SCHEMA_VERSION = 1;
@@ -12,7 +13,7 @@ const SAVED_GROUPINGS_INDEXES = [
 	{ field_name: "schemaVersion", field_schema: "integer" },
 	{ field_name: "embeddingModel", field_schema: "keyword" },
 	{ field_name: "embeddingDimensions", field_schema: "integer" },
-];
+] as const;
 
 export interface ApprovedGroup {
 	name: string;
@@ -55,21 +56,34 @@ export class GroupingVectorStore {
 		const savedGroupings = groups.map(savedGroupingPayload);
 		const texts = savedGroupings.map(groupText);
 
-		this.validateConnection();
-		let collection = await this.readCollection(signal);
+		const client = this.client();
+		let collection = await this.readCollection(client, signal);
 		const vectors = await embedTexts(texts, this.apiKey, signal);
 		const ids = texts.map(savedGroupingId);
 
 		// Validate embeddings before creating a collection or making any database write.
 		if (!collection) {
-			collection = await this.createCollection(signal);
+			collection = await this.createCollection(client, signal);
 		}
 
-		await this.ensureIndexes(collection, signal);
+		await this.ensureIndexes(client, collection, signal);
 
-		const points = savedGroupings.map((payload, index) => ({ id: ids[index], vector: vectors[index], payload }));
-		const { body } = await this.request("/points?wait=true", "PUT", { points }, signal);
-		const result = qdrantResult(body);
+		const points = savedGroupings.map((payload, index) => ({
+			id: ids[index],
+			vector: vectors[index],
+			payload: { ...payload },
+		}));
+		const response = await runVectorRequest("Qdrant", signal, (options) =>
+			client.api().upsertPoints(
+				{
+					collection_name: SAVED_GROUPINGS_COLLECTION,
+					wait: true,
+					points,
+				},
+				options,
+			),
+		);
+		const result = qdrantResult(response.data);
 
 		if (!isRecord(result) || result.status !== "completed") {
 			throw new Error(
@@ -89,9 +103,9 @@ export class GroupingVectorStore {
 			throw new Error("Saved grouping search limit must be between 1 and 20.");
 		}
 
-		this.validateConnection();
+		const client = this.client();
 
-		const collection = await this.readCollection(signal);
+		const collection = await this.readCollection(client, signal);
 
 		if (!collection) {
 			return [];
@@ -102,25 +116,26 @@ export class GroupingVectorStore {
 		}
 
 		const [vector] = await embedTexts([query], this.apiKey, signal);
-		const { body } = await this.request(
-			"/points/query",
-			"POST",
-			{
-				query: vector,
-				limit,
-				with_payload: true,
-				with_vector: false,
-				filter: {
-					must: [
-						{ key: "schemaVersion", match: { value: SCHEMA_VERSION } },
-						{ key: "embeddingModel", match: { value: EMBEDDING_MODEL } },
-						{ key: "embeddingDimensions", match: { value: EMBEDDING_DIMENSIONS } },
-					],
+		const response = await runVectorRequest("Qdrant", signal, (options) =>
+			client.api().queryPoints(
+				{
+					collection_name: SAVED_GROUPINGS_COLLECTION,
+					query: vector,
+					limit,
+					with_payload: true,
+					with_vector: false,
+					filter: {
+						must: [
+							{ key: "schemaVersion", match: { value: SCHEMA_VERSION } },
+							{ key: "embeddingModel", match: { value: EMBEDDING_MODEL } },
+							{ key: "embeddingDimensions", match: { value: EMBEDDING_DIMENSIONS } },
+						],
+					},
 				},
-			},
-			signal,
+				options,
+			),
 		);
-		const result = qdrantResult(body);
+		const result = qdrantResult(response.data);
 
 		if (!isRecord(result) || !Array.isArray(result.points) || result.points.length > limit) {
 			throw new Error("Qdrant returned invalid search results.");
@@ -163,24 +178,44 @@ export class GroupingVectorStore {
 		return matches;
 	}
 
-	private validateConnection() {
+	private client(): QdrantClient {
 		if (!this.connection.verifiedAt) {
 			throw new Error("Test and save your Qdrant connection before using saved groupings.");
 		}
 
-		normalizeQdrantUrl(this.connection.url);
-		validateApiKey(this.connection.apiKey, "Qdrant");
+		const url = normalizeQdrantUrl(this.connection.url);
+		const apiKey = validateApiKey(this.connection.apiKey, "Qdrant");
+
 		validateApiKey(this.apiKey, "OpenAI");
+
+		return new QdrantClient({
+			url,
+			apiKey,
+			port: null,
+			checkCompatibility: false,
+			// Its generated API accepts our per-request signal. The SDK timeout would replace that signal.
+			timeout: Infinity,
+		});
 	}
 
-	private async readCollection(signal?: AbortSignal): Promise<Record<string, unknown> | null> {
-		const response = await this.request("", "GET", undefined, signal, [404]);
+	private async readCollection(client: QdrantClient, signal?: AbortSignal): Promise<Record<string, unknown> | null> {
+		const response = await runVectorRequest("Qdrant", signal, async (options) => {
+			try {
+				return await client.api().getCollection({ collection_name: SAVED_GROUPINGS_COLLECTION }, options);
+			} catch (error) {
+				if (hasStatus(error, 404)) {
+					return null;
+				}
 
-		if (response.status === 404) {
+				throw error;
+			}
+		});
+
+		if (!response) {
 			return null;
 		}
 
-		const result = qdrantResult(response.body);
+		const result = qdrantResult(response.data);
 		const config = isRecord(result) ? result.config : undefined;
 		const params = isRecord(config) ? config.params : undefined;
 		const vectors = isRecord(params) ? params.vectors : undefined;
@@ -195,20 +230,31 @@ export class GroupingVectorStore {
 		return result;
 	}
 
-	private async createCollection(signal?: AbortSignal): Promise<Record<string, unknown> | null> {
-		const response = await this.request(
-			"",
-			"PUT",
-			{
-				vectors: { size: EMBEDDING_DIMENSIONS, distance: "Cosine" },
-			},
-			signal,
-			[400, 409],
-		);
+	private async createCollection(
+		client: QdrantClient,
+		signal?: AbortSignal,
+	): Promise<Record<string, unknown> | null> {
+		const response = await runVectorRequest("Qdrant", signal, async (options) => {
+			try {
+				return await client.api().createCollection(
+					{
+						collection_name: SAVED_GROUPINGS_COLLECTION,
+						vectors: { size: EMBEDDING_DIMENSIONS, distance: "Cosine" },
+					},
+					options,
+				);
+			} catch (error) {
+				if (hasStatus(error, 400) || hasStatus(error, 409)) {
+					return null;
+				}
 
-		// Another panel may have created it after our first read. Never assume that it is compatible.
-		if (response.status === 400 || response.status === 409) {
-			const collection = await this.readCollection(signal);
+				throw error;
+			}
+		});
+
+		// Another panel may have created it after our first read. Check it before writing points.
+		if (!response) {
+			const collection = await this.readCollection(client, signal);
 
 			if (!collection) {
 				throw new Error(
@@ -219,46 +265,36 @@ export class GroupingVectorStore {
 			return collection;
 		}
 
-		if (qdrantResult(response.body) !== true) {
+		if (qdrantResult(response.data) !== true) {
 			throw new Error("Qdrant returned an invalid collection creation response.");
 		}
 
 		return null;
 	}
 
-	private async ensureIndexes(collection: Record<string, unknown> | null, signal?: AbortSignal) {
+	private async ensureIndexes(
+		client: QdrantClient,
+		collection: Record<string, unknown> | null,
+		signal?: AbortSignal,
+	) {
 		// Cloud rejects filters on unindexed fields; create these before points enter the collection.
 		for (const index of missingIndexes(collection)) {
-			const { body } = await this.request("/index?wait=true", "PUT", index, signal);
-			const result = qdrantResult(body);
+			const response = await runVectorRequest("Qdrant", signal, (options) =>
+				client.api().createFieldIndex(
+					{
+						collection_name: SAVED_GROUPINGS_COLLECTION,
+						wait: true,
+						...index,
+					},
+					options,
+				),
+			);
+			const result = qdrantResult(response.data);
 
 			if (!isRecord(result) || result.status !== "completed") {
 				throw new Error("Qdrant did not confirm saved grouping index setup. Try saving again.");
 			}
 		}
-	}
-
-	private request(
-		path: string,
-		method: string,
-		body?: unknown,
-		signal?: AbortSignal,
-		allowedStatuses: number[] = [],
-	) {
-		const url = normalizeQdrantUrl(this.connection.url);
-		const key = validateApiKey(this.connection.apiKey, "Qdrant");
-
-		return requestVectorJson(
-			`${url}/collections/${SAVED_GROUPINGS_COLLECTION}${path}`,
-			{
-				method,
-				headers: { "api-key": key, "Content-Type": "application/json" },
-				body: body === undefined ? undefined : JSON.stringify(body),
-			},
-			"Qdrant",
-			signal,
-			allowedStatuses,
-		);
 	}
 }
 
@@ -331,9 +367,21 @@ function savedGroupingPayload(group: ApprovedGroup): SavedGrouping {
 
 function groupText(group: ApprovedGroup): string {
 	// Browser order and approval time do not change what a group means or its identity.
-	const pages = group.pages.map(({ title, url }) => JSON.stringify({ title, url })).sort();
+	const pages = group.pages.map(({ title, url }) => ({ title, url }));
 
-	return JSON.stringify({ name: group.name, pages: pages.map((page) => JSON.parse(page)) });
+	pages.sort((left, right) => {
+		// Keep the original ordering for escaped titles and URLs, preserving saved IDs.
+		const leftText = JSON.stringify(left);
+		const rightText = JSON.stringify(right);
+
+		if (leftText === rightText) {
+			return 0;
+		}
+
+		return leftText < rightText ? -1 : 1;
+	});
+
+	return JSON.stringify({ name: group.name, pages });
 }
 
 function savedGroupingId(text: string): string {

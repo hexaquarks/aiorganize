@@ -10,5 +10,5 @@
 		"skipLibCheck": true,
 		"types": ["chrome", "vite/client", "node"]
 	},
-	"include": ["extension/**/*.ts", "extension/**/*.svelte", "tests/**/*.ts", "vite.config.ts"]
+	"include": ["extension/**/*.ts", "extension/**/*.svelte", "tests/**/*.ts", "vite.config.ts", "vitest.config.ts"]
 }

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { afterEach, test } from "node:test";
+import { afterEach, test } from "vitest";
 
 import { embedTexts, EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../../extension/embeddings";
 import { GroupingVectorStore, SAVED_GROUPINGS_COLLECTION } from "../../extension/vector-store";
@@ -341,7 +341,7 @@ test("invalid inputs and credentials fail before network access", async () => {
 
 test("API failures are sanitized for both services", async () => {
 	for (const status of [401, 403, 429, 500]) {
-		mockNetwork(() => Response.json({ error: { message: "provider-secret" } }, { status }));
+		const requests = mockNetwork(() => Response.json({ error: { message: "provider-secret" } }, { status }));
 
 		await assert.rejects(embedTexts(["Python"], "openai-test-key"), (error: Error) => {
 			assert.equal(error.message.includes("provider-secret"), false);
@@ -351,7 +351,32 @@ test("API failures are sanitized for both services", async () => {
 			assert.equal(error.message.includes("provider-secret"), false);
 			return /Qdrant/.test(error.message);
 		});
+
+		assert.equal(requests.length, 2);
 	}
+});
+
+test("sorting page objects preserves existing IDs and does not change caller page order", async () => {
+	mockNetwork((request) => {
+		if (request.url.includes("openai.com")) {
+			return embeddingResponse();
+		}
+
+		return request.method === "GET" ? compatibleCollection() : ok({ status: "completed" });
+	});
+	const pages = [
+		{ title: '"Quote', url: "https://tabs.test/z" },
+		{ title: "Alpha", url: "https://tabs.test/b" },
+		{ title: "Alpha", url: "https://tabs.test/a" },
+	];
+	const originalPages = structuredClone(pages);
+
+	const ids = await store().saveGroups([{ ...group, pages }]);
+	const reorderedIds = await store().saveGroups([{ ...group, pages: [...pages].reverse() }]);
+
+	assert.deepEqual(ids, ["cb477791-97c2-578f-8366-0d78a0c695cf"]);
+	assert.deepEqual(reorderedIds, ids);
+	assert.deepEqual(pages, originalPages);
 });
 
 test("unconfirmed writes and malformed JSON are not reported as successful saves", async () => {
@@ -367,7 +392,7 @@ test("unconfirmed writes and malformed JSON are not reported as successful saves
 		await assert.rejects(store().saveGroups([group]), /confirm/i);
 	}
 
-	mockNetwork(() => new Response("not-json-provider-secret"));
+	mockNetwork(() => new Response("not-json-provider-secret", { headers: { "Content-Type": "application/json" } }));
 	await assert.rejects(store().search("Python"), /invalid response/i);
 	await assert.rejects(embedTexts(["Python"], "key"), /invalid response/i);
 });

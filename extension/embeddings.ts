@@ -1,4 +1,6 @@
-import { isRecord, requestVectorJson, validateApiKey } from "./vector-http";
+import OpenAI from "openai";
+
+import { isRecord, runVectorRequest, validateApiKey } from "./vector-requests";
 
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSIONS = 1536;
@@ -12,20 +14,28 @@ export async function embedTexts(texts: string[], apiKey: string, signal?: Abort
 		throw new Error("Enter between 1 and 1,000 nonempty embedding inputs.");
 	}
 
-	const { body } = await requestVectorJson(
-		"https://api.openai.com/v1/embeddings",
-		{
-			method: "POST",
-			headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-			body: JSON.stringify({
+	const client = new OpenAI({
+		apiKey: key,
+		// The extension uses the owner's key in its trusted panel, never in a web page.
+		dangerouslyAllowBrowser: true,
+		maxRetries: 0,
+		timeout: 30000,
+		fetch: globalThis.fetch,
+	});
+
+	const body = await runVectorRequest("OpenAI", signal, (options) =>
+		client.embeddings.create(
+			{
 				model: EMBEDDING_MODEL,
 				dimensions: EMBEDDING_DIMENSIONS,
 				encoding_format: "float",
 				input: texts,
-			}),
-		},
-		"OpenAI",
-		signal,
+			},
+			{
+				signal: options.signal,
+				fetchOptions: { redirect: options.redirect, credentials: options.credentials },
+			},
+		),
 	);
 
 	if (

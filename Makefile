@@ -15,4 +15,5 @@ store-status:
 test:
 	npm run check
 	npm run build
+	npm test
 	uv run python -m unittest discover -s tests

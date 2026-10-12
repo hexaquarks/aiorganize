@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { afterEach, test } from "node:test";
+import { afterEach, test } from "vitest";
 
 import { embedTexts, EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../../extension/embeddings";
 
@@ -82,7 +82,8 @@ test("HTTP failures, invalid JSON, and wrong models use safe error messages", as
 		});
 	}
 
-	globalThis.fetch = async () => new Response("not-json-provider-secret");
+	globalThis.fetch = async () =>
+		new Response("not-json-provider-secret", { headers: { "Content-Type": "application/json" } });
 	await assert.rejects(embedTexts(["Python"], "key"), /invalid response/i);
 
 	globalThis.fetch = async () => Response.json({ model: "wrong-model", data: [{ index: 0, embedding: vector() }] });
