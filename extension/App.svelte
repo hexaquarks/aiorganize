@@ -29,6 +29,7 @@
 	function editConnection() {
 		grouping.pending = null;
 		grouping.status = "";
+		grouping.retrievalStatus = "";
 
 		connection.edit();
 	}
@@ -100,6 +101,7 @@
 			onclick={() => {
 				grouping.pending = null;
 				grouping.status = "";
+				grouping.retrievalStatus = "";
 				void connection.forget();
 			}}><Icon name="trash" /> Remove key</button
 		>
@@ -108,6 +110,9 @@
 		<span id="activity" class:spinning={grouping.busy} aria-hidden="true"></span>
 		<p id="status" role="status" aria-live="polite">{grouping.status}</p>
 	</div>
+	<p id="retrieval-status" class="note" hidden={!grouping.retrievalStatus} role="status" aria-live="polite">
+		{grouping.retrievalStatus}
+	</p>
 	<div class="mt-2" hidden={!grouping.savedGroupingsStatus}>
 		<p id="saved-groupings-status" class="note" role="status" aria-live="polite">{grouping.savedGroupingsStatus}</p>
 		{#if grouping.canRetrySave}

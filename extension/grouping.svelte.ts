@@ -4,7 +4,7 @@ import { applyGroups, getTabState } from "./tabs";
 import { getQdrantSettings, getSettings } from "./settings";
 import { GroupingVectorStore } from "./vector-store";
 import type { ApprovedGroup } from "./vector-store";
-import type { PendingProposal } from "./types";
+import type { GroupingExample, PageInfo, PendingProposal } from "./types";
 
 export class GroupingState {
 	pending = $state<PendingProposal | null>(null);
@@ -12,6 +12,7 @@ export class GroupingState {
 	tabCount = $state(0);
 	status = $state("");
 	savedGroupingsStatus = $state("");
+	retrievalStatus = $state("");
 	canRetrySave = $state(false);
 
 	private controller = new AbortController();
@@ -32,6 +33,7 @@ export class GroupingState {
 		this.pending = null;
 		this.groupsToSave = null;
 		this.savedGroupingsStatus = "";
+		this.retrievalStatus = "";
 		this.canRetrySave = false;
 		this.busy = true;
 		this.status = "Reading this window’s tabs…";
@@ -49,8 +51,11 @@ export class GroupingState {
 				throw new Error("The selected Chrome window is unavailable.");
 			}
 
+			const savedGroupings = await this.retrieveGroupings(snapshot);
+
 			const proposal = await requestProposal({
 				snapshot,
+				savedGroupings,
 				signal: this.controller.signal,
 				onProgress: (message) => {
 					this.status = message;
@@ -74,7 +79,43 @@ export class GroupingState {
 
 	reject() {
 		this.pending = null;
+		this.retrievalStatus = "";
 		this.status = "Proposal rejected. Your tabs haven’t changed.";
+	}
+
+	private async retrieveGroupings(snapshot: PageInfo[]): Promise<GroupingExample[]> {
+		try {
+			const qdrant = await getQdrantSettings();
+
+			if (!qdrant.verifiedAt) {
+				return [];
+			}
+
+			this.status = "Finding saved grouping examples…";
+			const openai = await getSettings();
+			const store = new GroupingVectorStore(qdrant, openai.apiKey);
+			const query = JSON.stringify({ pages: snapshot.map(({ title, url }) => ({ title, url })) });
+
+			const matches = await store.search(query, 5, this.controller.signal);
+			const examples = matches.map((match) => match.savedGrouping);
+
+			if (examples.length) {
+				const label = examples.length === 1 ? "example" : "examples";
+
+				this.retrievalStatus = `Using ${examples.length} saved grouping ${label}.`;
+			} else {
+				this.retrievalStatus = "No saved grouping examples found.";
+			}
+
+			return examples;
+		} catch (error) {
+			if (this.controller.signal.aborted) {
+				throw error;
+			}
+
+			this.retrievalStatus = "Saved groupings unavailable. Using current tabs only.";
+			return [];
+		}
 	}
 
 	async approve() {
