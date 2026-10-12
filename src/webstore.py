@@ -18,7 +18,7 @@ API_URL = "https://chromewebstore.googleapis.com"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 
 
-def request_json(request: Request) -> dict:
+def _request_json(request: Request) -> dict:
     """Keep provider error bodies out of logs because they can contain credentials."""
     try:
         with urlopen(request, timeout=30) as response:
@@ -36,7 +36,7 @@ def request_json(request: Request) -> dict:
     return result
 
 
-def required_environment(name: str) -> str:
+def _required_environment(name: str) -> str:
     value = os.environ.get(name, "").strip()
     if not value:
         raise ValueError(f"Set {name} in your local environment or .env before using the store API.")
@@ -45,42 +45,42 @@ def required_environment(name: str) -> str:
 
 class WebStoreClient:
     def __init__(self):
-        publisher = required_environment("CWS_PUBLISHER_ID")
-        item = required_environment("CWS_EXTENSION_ID")
+        publisher = _required_environment("CWS_PUBLISHER_ID")
+        item = _required_environment("CWS_EXTENSION_ID")
         if not re.fullmatch(r"[a-zA-Z0-9_-]+", publisher) or not re.fullmatch(r"[a-p]{32}", item):
             raise ValueError("Use the publisher ID and 32-character extension ID from the developer dashboard.")
-        self.name = f"publishers/{publisher}/items/{item}"
+        self._name = f"publishers/{publisher}/items/{item}"
         credentials = {
-            "client_id": required_environment("CWS_CLIENT_ID"),
-            "client_secret": required_environment("CWS_CLIENT_SECRET"),
-            "refresh_token": required_environment("CWS_REFRESH_TOKEN"),
+            "client_id": _required_environment("CWS_CLIENT_ID"),
+            "client_secret": _required_environment("CWS_CLIENT_SECRET"),
+            "refresh_token": _required_environment("CWS_REFRESH_TOKEN"),
             "grant_type": "refresh_token",
         }
-        response = request_json(Request(
+        response = _request_json(Request(
             TOKEN_URL, data=urlencode(credentials).encode(),
             headers={"Content-Type": "application/x-www-form-urlencoded"}, method="POST",
         ))
         token = response.get("access_token")
         if not isinstance(token, str) or not token or "\n" in token or "\r" in token:
             raise ValueError("Google did not return an access token. Check the OAuth configuration.")
-        self.token = token
+        self._token = token
 
-    def request(self, action: str, *, data: bytes | None = None, upload: bool = False) -> dict:
+    def _request(self, action: str, *, data: bytes | None = None, upload: bool = False) -> dict:
         prefix = "upload/v2" if upload else "v2"
-        return request_json(Request(
-            f"{API_URL}/{prefix}/{self.name}:{action}", data=data,
+        return _request_json(Request(
+            f"{API_URL}/{prefix}/{self._name}:{action}", data=data,
             headers={
-                "Authorization": f"Bearer {self.token}",
+                "Authorization": f"Bearer {self._token}",
                 "Content-Type": "application/zip" if upload else "application/json",
             },
             method="POST" if data is not None else "GET",
         ))
 
     def status(self) -> dict:
-        return self.request("fetchStatus")
+        return self._request("fetchStatus")
 
     def upload(self, package: bytes, *, wait_seconds: float = 120) -> None:
-        response = self.request("upload", data=package, upload=True)
+        response = self._request("upload", data=package, upload=True)
         state = response.get("uploadState")
         deadline = time.monotonic() + wait_seconds
         # The enum is IN_PROGRESS; Google's guide also uses the older UPLOAD_IN_PROGRESS spelling.
@@ -93,7 +93,7 @@ class WebStoreClient:
             raise ValueError("The store did not confirm a successful upload. Check the developer dashboard.")
 
     def publish_private(self) -> dict:
-        return self.request("publish", data=json.dumps({
+        return self._request("publish", data=json.dumps({
             "publishType": "DEFAULT_PUBLISH", "skipReview": False, "blockOnWarnings": True,
         }).encode())
 
@@ -152,8 +152,12 @@ def main() -> None:
     commands.add_parser("status", help="Read the item's upload and review status.")
     upload = commands.add_parser("release", help="Build and upload an existing tag; submission is optional.")
     upload.add_argument("--tag", required=True)
-    upload.add_argument("--publish-private", action="store_true", help="Submit the update using existing private visibility.")
-    upload.add_argument("--confirm-owner-only", action="store_true", help="Confirm the dashboard tester list contains only you.")
+    upload.add_argument(
+        "--publish-private", action="store_true", help="Submit the update using existing private visibility.",
+    )
+    upload.add_argument(
+        "--confirm-owner-only", action="store_true", help="Confirm the dashboard tester list contains only you.",
+    )
     args = parser.parse_args()
     try:
         if args.command == "release" and args.publish_private and not args.confirm_owner_only:
@@ -170,7 +174,10 @@ def main() -> None:
                 "warned": status.get("warned", False),
             }, indent=2))
         else:
-            release(client, args.tag, publish_private=args.publish_private, owner_only_confirmed=args.confirm_owner_only)
+            release(
+                client, args.tag,
+                publish_private=args.publish_private, owner_only_confirmed=args.confirm_owner_only,
+            )
     except (OSError, ValueError, KeyError, subprocess.CalledProcessError) as error:
         parser.error(str(error))
 

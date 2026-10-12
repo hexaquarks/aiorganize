@@ -8,6 +8,9 @@ packages = ["src"]
 [project]
 name = "aiorganize"
 version = "0.1.0"
+description = "AI-powered Chrome tab organization with user-approved groups."
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
 dependencies = [
     "playwright>=1.63.0",

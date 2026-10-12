@@ -1,7 +1,7 @@
 {
   "name": "AI Organize Groups",
   "summary": "Preview AI topic groups for your tabs, then approve to apply. Uses your OpenAI API key directly in Chrome.",
-  "description": "Organize the tabs in your current Chrome window into topic groups. Add your OpenAI API key in API settings, click Organize tabs, review the proposed groups, then approve to apply or reject to leave your tabs unchanged. Grouping uses tab titles and URLs; page contents are not read.\n\nRuns entirely in Chrome and calls OpenAI directly; no Python installation, local companion, terminal, or repository is required. An OpenAI API account and access to the selected model are required. API charges may apply.\n\nKeys are kept for the browser session by default. Remember key on this device stores it locally without encryption, never in Chrome Sync. Forget key removes the stored key. When you request a proposal, tab titles and URLs are sent to OpenAI. This private development release is intended only for its owner\u2019s Google account.",
+  "description": "Organize the tabs in your current Chrome window into topic groups. Add your OpenAI API key in API settings, click Organize tabs, review the proposed groups, then approve to apply or reject to leave your tabs unchanged. Grouping uses tab titles and URLs; page contents are not read.\n\nRuns entirely in Chrome and calls OpenAI directly; no Python installation, local companion, terminal, or repository is required. An OpenAI API account and access to the selected model are required. API charges may apply.\n\nKeys are kept for the browser session by default. Remember key on this device stores it locally without encryption, never in Chrome Sync. Forget key removes the stored key. When you request a proposal, tab titles and URLs are sent to OpenAI.",
   "single_purpose": "Propose and apply topic-based Chrome tab groups after the user reviews and approves them.",
   "permission_justifications": {
     "tabs": "Read titles, URLs, and tab IDs to propose groups and recheck the selected window before applying them.",
@@ -23,7 +23,7 @@
     "sale_or_advertising": false
   },
   "assets": {
-    "icon": "extension/icons/128.png",
+    "icon": "extension/icons/brand.png",
     "small_promo": "store/promo-440x280.png",
     "screenshot": "store/preview-1280x800.png",
     "screenshot_note": "Actual panel rendered with offline sample tabs and a deterministic proposal; no personal browsing data."
