@@ -72,7 +72,7 @@ class DevelopmentStartupTest(unittest.TestCase):
                 patch("src.dev.Path.is_file", return_value=True), \
                 patch("src.dev.subprocess.Popen") as process, \
                 patch("src.dev.shutil.which", return_value="/usr/bin/open"), \
-                patch("src.dev.run_dev") as isolated:
+                patch("src.dev.run_dev") as isolated, patch("src.dev.build_frontend"):
             dev.main()
 
         self.assertEqual(process.call_args_list[0].args[0], [

@@ -7,9 +7,9 @@ from zipfile import ZipFile
 
 from playwright.async_api import expect
 
-from src.build import EXTENSION_FILES, PROJECT, build_zip
+from src.build import COMPILED_EXTENSION, EXTENSION_FILES, PROJECT, build_zip
 from tests.integration.test_panel import PanelTestCase
-from tests.fixtures import PRIVATE_PAGE_TEXT
+from tests.fixtures import PRIVATE_PAGE_TEXT, TAB_STATE
 
 
 class BrowserApiTest(PanelTestCase):
@@ -87,7 +87,7 @@ class BrowserApiTest(PanelTestCase):
         await self.organize()
         await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
         await expect(self.panel.locator("#status")).to_have_text("Your tabs are organized.")
-        state = await self.panel.evaluate("async () => (await import('./tabs.js')).getTabState()")
+        state = await self.panel.evaluate(TAB_STATE)
         self.assertEqual({group["name"] for group in state["groups"]}, {"Dev", "Other"})
 
     async def test_invalid_proposal_and_provider_error_are_safe(self):
@@ -124,8 +124,7 @@ class BrowserApiTest(PanelTestCase):
         await expect(self.panel.locator("#remember-key")).to_be_checked()
         await self.panel.locator("#forget-key").click()
         self.assertEqual(await self.panel.evaluate("""async () => {
-            const {getSettings} = await import('./settings.js');
-            return (await getSettings()).apiKey;
+            return (await chrome.storage.session.get("connection")).connection?.apiKey || "";
         }"""), "")
 
     async def test_aborted_browser_request_does_not_create_a_preview(self):
@@ -135,8 +134,7 @@ class BrowserApiTest(PanelTestCase):
         await expect(self.panel.locator("#organize")).to_be_disabled()
         await asyncio.wait_for(self.request_started.wait(), timeout=10)
         await self.panel.evaluate("""async () => {
-            const {panel} = await import('./panel.js');
-            panel.destroy();
+            window.dispatchEvent(new Event("pagehide"));
         }""")
         self.finish_request.set()
         await asyncio.wait_for(self.request_finished.wait(), timeout=10)
@@ -149,7 +147,7 @@ class PackagedBrowserApiTest(BrowserApiTest):
         directory = tempfile.TemporaryDirectory(prefix="aiorganize-package-test-")
         self.addCleanup(directory.cleanup)
         self.extension_path = Path(directory.name)
-        files = {name: (PROJECT / "extension" / name).read_bytes() for name in EXTENSION_FILES}
+        files = {name: (COMPILED_EXTENSION / name).read_bytes() for name in EXTENSION_FILES}
         version = json.loads(files["manifest.json"])["version"]
         with ZipFile(io.BytesIO(build_zip(files, f"v{version}", []))) as archive:
             archive.extractall(self.extension_path)

@@ -1,10 +1,13 @@
+import asyncio
+import json
 import tempfile
 import unittest
 
 from playwright.async_api import async_playwright, expect
 
 from src.dev import CHROME_ARGS, load_extension
-from tests.fixtures import EXTENSION_PATH, create_test_tabs
+from src.build import PROJECT
+from tests.fixtures import EXTENSION_PATH, TAB_STATE, create_test_tabs
 
 
 class PanelTestCase(unittest.IsolatedAsyncioTestCase):
@@ -35,7 +38,6 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
 
     async def connect(self, *, remember=False, api_key="test-secret"):
         async def respond(route):
-            import json
             request = route.request.post_data_json
             tabs = json.loads(request["input"])["tabs"]
             proposal = {"groups": [{"name": "Test", "tab_ids": [tab["id"] for tab in tabs]}]}
@@ -51,32 +53,48 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
         await self.panel.locator("#test-connection").click()
         await expect(self.panel.locator("#ready")).to_be_visible()
 
+    async def read_settings(self):
+        return await self.panel.evaluate("""async () => {
+            const local = await chrome.storage.local.get();
+            const session = await chrome.storage.session.get();
+            const connection = session.connection || local.connection;
+            return connection ? {...connection, remember: !session.connection} : {
+                apiKey: session.apiKey || local.apiKey || '',
+                model: document.querySelector('#api-model').value,
+                verifiedAt: null,
+                remember: Boolean(local.apiKey),
+            };
+        }""")
+
     async def install_proposal_fixture(self, *, invalid=False, delayed=False):
         await self.connect()
-        # Fake proposals live only in tests; the installed extension never fabricates AI results.
-        await self.panel.evaluate(
-            """async ({invalid, delayed}) => {
-                const {panel, mountPanel} = await import('./panel.js');
-                panel.destroy();
-                mountPanel(document, async ({snapshot}) => {
-                    if (delayed) await new Promise(resolve => { window.resolveProposal = resolve; });
-                    const groups = [
-                        {name: 'Other', tab_ids: snapshot.slice(2).map(tab => tab.id)},
-                        {name: 'Dev', tab_ids: snapshot.slice(0, 2).map(tab => tab.id)},
-                    ];
-                    if (invalid) groups[1].tab_ids.push(snapshot[2].id);
-                    return {groups};
-                });
-            }""",
-            {"invalid": invalid, "delayed": delayed},
-        )
+        await self.panel.unroute("https://api.openai.com/v1/responses")
+        self.proposal_started = asyncio.Event()
+        self.finish_proposal = asyncio.Event()
+
+        async def respond(route):
+            snapshot = json.loads(route.request.post_data_json["input"])["tabs"]
+            self.proposal_started.set()
+            if delayed:
+                await self.finish_proposal.wait()
+            groups = [
+                {"name": "Other", "tab_ids": [tab["id"] for tab in snapshot[2:]]},
+                {"name": "Dev", "tab_ids": [tab["id"] for tab in snapshot[:2]]},
+            ]
+            if invalid:
+                groups[1]["tab_ids"].append(snapshot[2]["id"])
+            await route.fulfill(json={"status": "completed", "output": [{"content": [{
+                "type": "output_text", "text": json.dumps({"groups": groups}),
+            }]}]})
+
+        await self.panel.route("https://api.openai.com/v1/responses", respond)
 
     async def organize(self):
         await self.panel.locator("#organize").click()
         await expect(self.panel.locator("#preview")).to_be_visible()
 
     async def assert_no_groups(self):
-        state = await self.panel.evaluate("async () => (await import('./tabs.js')).getTabState()")
+        state = await self.panel.evaluate(TAB_STATE)
         self.assertEqual(state["groups"], [])
         self.assertTrue(all(tab["group_id"] == -1 for tab in state["tabs"]))
 
@@ -136,7 +154,7 @@ class ExtensionPanelTest(PanelTestCase):
         await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
         await expect(self.panel.locator("#status")).to_have_text("Your tabs are organized.")
         await expect(self.panel.locator("#preview")).to_be_hidden()
-        state = await self.panel.evaluate("async () => (await import('./tabs.js')).getTabState()")
+        state = await self.panel.evaluate(TAB_STATE)
         self.assertEqual({group["name"] for group in state["groups"]}, {"Dev", "Other"})
         self.assertTrue(all(tab["group_id"] != -1 for tab in state["tabs"]))
         self.assertEqual(
@@ -168,9 +186,8 @@ class ExtensionPanelTest(PanelTestCase):
         await self.install_proposal_fixture()
         await self.organize()
         await self.panel.evaluate("""async () => {
-            const {getTabState} = await import('./tabs.js');
-            const {tabs} = await getTabState();
-            await chrome.windows.create({tabId: tabs[0].chrome_id});
+            const tabs = await chrome.tabs.query({});
+            await chrome.windows.create({tabId: tabs[0].id});
         }""")
         await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
         await expect(self.panel.locator("#status")).to_contain_text("one browser window")
@@ -198,10 +215,10 @@ class ExtensionPanelTest(PanelTestCase):
         )
         await self.install_proposal_fixture(delayed=True)
         await self.panel.locator("#organize").click()
-        await self.panel.wait_for_function("typeof window.resolveProposal === 'function'")
+        await asyncio.wait_for(self.proposal_started.wait(), timeout=10)
         await expect(self.panel.locator("#organize")).to_be_disabled()
         await expect(self.panel.locator("#approve")).to_be_disabled()
-        await self.panel.evaluate("window.resolveProposal()")
+        self.finish_proposal.set()
         await expect(self.panel.locator("#preview")).to_be_visible()
         await expect(self.panel.locator(".tab-title").first).to_have_text('<img src=x onerror=alert(1)>')
         self.assertEqual(await self.panel.locator("#groups img").count(), 0)
@@ -214,10 +231,24 @@ class ExtensionPanelTest(PanelTestCase):
         await expect(self.panel.locator("#summary")).to_have_text("6 tabs in 2 groups.")
         await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
         await expect(self.panel.locator("#status")).to_have_text("Your tabs are organized.")
-        state = await self.panel.evaluate("async () => (await import('./tabs.js')).getTabState()")
+        state = await self.panel.evaluate(TAB_STATE)
         other_tabs = [tab for tab in state["tabs"] if tab["window_id"] == other_window["id"]]
         self.assertEqual(len(other_tabs), 1)
         self.assertEqual(other_tabs[0]["group_id"], -1)
+
+
+class SourceDirectoryStartupTest(PanelTestCase):
+    extension_path = PROJECT / "extension"
+
+    async def test_existing_source_installation_loads_and_organizes(self):
+        await self.connect()
+        await self.organize()
+        await self.assert_no_groups()
+
+        await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
+        await expect(self.panel.locator("#status")).to_have_text("Your tabs are organized.")
+        state = await self.panel.evaluate(TAB_STATE)
+        self.assertEqual([group["name"] for group in state["groups"]], ["Test"])
 
 
 if __name__ == "__main__":

@@ -1,10 +1,9 @@
 from html import escape
-from pathlib import Path
 
 from playwright.async_api import BrowserContext, Route
 
 
-EXTENSION_PATH = Path(__file__).resolve().parents[1] / "extension"
+from src.build import COMPILED_EXTENSION as EXTENSION_PATH
 
 TEST_TABS = {
     "https://tabs.test/python": "Python Tutorial",
@@ -33,3 +32,14 @@ async def create_test_tabs(context: BrowserContext) -> None:
     for index, url in enumerate(TEST_TABS):
         page = first_page if index == 0 else await context.new_page()
         await page.goto(url)
+
+
+TAB_STATE = """async () => {
+    const tabs = (await chrome.tabs.query({})).filter(tab => !tab.url?.startsWith(chrome.runtime.getURL('')));
+    const groups = await chrome.tabGroups.query({});
+    return {
+        tabs: tabs.map(tab => ({id: `tab-${tab.id}`, chrome_id: tab.id, group_id: tab.groupId,
+            window_id: tab.windowId, index: tab.index, title: tab.title, url: tab.url})),
+        groups: groups.map(group => ({id: group.id, name: group.title, color: group.color, window_id: group.windowId})),
+    };
+}"""

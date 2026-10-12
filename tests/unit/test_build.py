@@ -9,12 +9,12 @@ from unittest.mock import patch
 from zipfile import ZipFile
 
 from src import build
-from src.build import EXTENSION_FILES, PROJECT, build_zip, chrome_version, tagged_files
+from src.build import COMPILED_EXTENSION, EXTENSION_FILES, PROJECT, build_zip, chrome_version, tagged_files
 
 
 class PackageExtensionTest(unittest.TestCase):
     def setUp(self):
-        self.files = {name: (PROJECT / "extension" / name).read_bytes() for name in EXTENSION_FILES}
+        self.files = {name: (COMPILED_EXTENSION / name).read_bytes() for name in EXTENSION_FILES}
         manifest = json.loads(self.files["manifest.json"])
         manifest["version"] = "0.1.0"
         self.files["manifest.json"] = json.dumps(manifest).encode()
@@ -33,7 +33,7 @@ class PackageExtensionTest(unittest.TestCase):
             self.assertNotIn("scripting", manifest["permissions"])
             self.assertEqual(manifest["host_permissions"], ["https://api.openai.com/*"])
             self.assertNotIn("page-reader.js", archive.namelist())
-            # Development and release execute exactly the same source files.
+            # Development and release execute the same compiled files.
             for name in EXTENSION_FILES:
                 self.assertEqual(archive.read(name), self.files[name])
             self.assertEqual(manifest["version"], "0.1.0")
@@ -54,7 +54,7 @@ class PackageExtensionTest(unittest.TestCase):
                 chrome_version(version)
 
     def test_missing_required_asset_fails(self):
-        del self.files["panel.js"]
+        del self.files["runtime/panel.js"]
         with self.assertRaises(KeyError):
             build_zip(self.files, "v0.1.0", [])
 
@@ -78,7 +78,7 @@ class PackageExtensionTest(unittest.TestCase):
             run_git("add", "extension")
             run_git("-c", "commit.gpgsign=false", "commit", "-m", "Test")
             run_git("tag", "v0.1.0")
-            (root / "extension/panel.js").write_text("dirty change")
+            (root / "extension/runtime/panel.js").write_text("dirty change")
             with patch.object(build, "PROJECT", root):
                 self.assertEqual(tagged_files("v0.1.0"), self.files)
                 with patch("sys.argv", ["build", "--tag", "v0.1.0"]):

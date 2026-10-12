@@ -10,8 +10,10 @@ from pathlib import Path
 
 from playwright.async_api import BrowserContext, Error, async_playwright
 
+from .build import PROJECT, build_frontend
 
-EXTENSION_PATH = Path(__file__).resolve().parents[1] / "extension"
+
+EXTENSION_PATH = PROJECT / "extension"
 CHROME_ARGS = ["--enable-unsafe-extension-debugging"]
 DEFAULT_PROFILE = Path.home() / ".aiorganize" / "chrome"
 
@@ -134,6 +136,7 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
+        build_frontend()
         if args.isolated or args.check or args.profile:
             profile = (args.profile or DEFAULT_PROFILE).resolve()
             asyncio.run(run_dev(profile, check=args.check))
@@ -141,7 +144,7 @@ def main() -> None:
             open_regular_chrome()
     except KeyboardInterrupt:
         pass
-    except (RuntimeError, OSError, Error) as error:
+    except (RuntimeError, OSError, ValueError, subprocess.CalledProcessError, Error) as error:
         raise SystemExit(str(error)) from None
 
 

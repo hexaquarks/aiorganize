@@ -6,7 +6,7 @@ from urllib.error import HTTPError
 from urllib.parse import parse_qs
 
 from src import webstore
-from src.build import EXTENSION_FILES, PROJECT
+from src.build import COMPILED_EXTENSION, EXTENSION_FILES, PROJECT
 from src.webstore import WebStoreClient, release, store_versions
 
 
@@ -19,7 +19,7 @@ PRIVATE_STATUS = {
 
 class WebStoreTest(unittest.TestCase):
     def setUp(self):
-        self.files = {name: (PROJECT / "extension" / name).read_bytes() for name in EXTENSION_FILES}
+        self.files = {name: (COMPILED_EXTENSION / name).read_bytes() for name in EXTENSION_FILES}
         manifest = json.loads(self.files["manifest.json"])
         manifest["version"] = "0.1.0"
         self.files["manifest.json"] = json.dumps(manifest).encode()

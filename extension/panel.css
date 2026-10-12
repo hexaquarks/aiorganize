@@ -1,4 +1,7 @@
+@import "tailwindcss";
+
 :root {
+	line-height: normal;
 	color-scheme: light;
 	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 	--background: #f8f9ff;
@@ -34,9 +37,7 @@ main {
 .topbar,
 .brand,
 .label-row {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
+	@apply flex items-center justify-between;
 }
 
 .topbar {
@@ -273,11 +274,6 @@ button:disabled {
 	margin: 16px 10px;
 }
 
-.privacy-note > span:first-child {
-	font-size: 27px;
-	line-height: 1;
-}
-
 main[data-connected="true"] .privacy-note {
 	display: none;
 }
@@ -363,8 +359,7 @@ main[data-connected="true"] .privacy-note {
 }
 
 .connection-check {
-	display: grid;
-	place-items: center;
+	@apply grid place-items-center;
 	flex: 0 0 34px;
 	height: 34px;
 	border-radius: 50%;
@@ -537,9 +532,7 @@ main[data-connected="true"] .privacy-note {
 }
 
 .section-heading {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
+	@apply flex items-center justify-between;
 	gap: 8px;
 }
 
@@ -575,9 +568,7 @@ h2 {
 }
 
 .group-header {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
+	@apply flex items-center justify-between;
 	gap: 8px;
 	padding: 13px;
 	margin-bottom: 6px;
@@ -585,9 +576,7 @@ h2 {
 }
 
 h3 {
-	display: flex;
-	align-items: center;
-	gap: 8px;
+	@apply flex items-center gap-2;
 	margin: 0;
 	font-size: 13px;
 	font-weight: 650;
@@ -620,8 +609,7 @@ li:hover {
 }
 
 .tab-icon {
-	display: grid;
-	place-items: center;
+	@apply grid place-items-center;
 	flex: 0 0 28px;
 	height: 28px;
 	border: 1px solid var(--border);
@@ -637,9 +625,7 @@ li:hover {
 
 .tab-title {
 	display: block;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	@apply truncate;
 	font-size: 12px;
 	line-height: 1.4;
 }
@@ -649,9 +635,7 @@ li:hover {
 	margin-top: 2px;
 	font-size: 10px;
 	color: var(--muted);
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	@apply truncate;
 }
 
 .actions {
@@ -693,8 +677,7 @@ li:hover {
 	position: absolute;
 	left: 14px;
 	top: 15px;
-	display: grid;
-	place-items: center;
+	@apply grid place-items-center;
 	width: 22px;
 	height: 22px;
 	border-radius: 50%;

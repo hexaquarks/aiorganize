@@ -1,8 +1,8 @@
 Local preparation
 
-Run uv sync and make test. Run make build for a working-tree preview in dist/.
-The ZIP packages the same extension files used in development, using a fixed allowlist and stable
-ZIP metadata. It includes no API key, Python, tests, or store submission material. Host access is
+Run uv sync, npm ci, and make test. Run make build for a working-tree preview in dist/.
+The ZIP packages the compiled extension from dist/extension, using a fixed allowlist and stable
+ZIP metadata. Development loads extension/ with generated files in extension/runtime/. It includes no API key, Python, tests, or store submission material. Host access is
 limited to the model API.
 Regenerate artwork and the sample panel screenshot with uv run python -m tests.store_assets.
 The screenshot uses offline fixtures; it is not evidence of a live model or Web Store installation.
@@ -15,7 +15,7 @@ the full history and tags before release checks. Versions have 1–4 numeric par
 no leading zeros, and cannot be all zero. Missing components compare as zero.
 After the release tag exists, run:
   uv run python -m src.build --tag v0.1.0
-The builder reads only the tag's committed files, checks ancestor release versions, and emits a ZIP
+The builder compiles an isolated tagged checkout with npm ci, checks ancestor release versions, and emits a ZIP
 and SHA-256 sidecar in dist/. It does not create tags, push, upload, or publish.
 If the latest store version has no ancestor tag, also pass --previous-version <latest-store-version>.
 Always compare with the actual dashboard version; local tags alone cannot prove the store's state.
@@ -30,7 +30,7 @@ Review instructions: install the extension, open API settings, enter an OpenAI A
 a model the account can use. Generate, reject, and approve proposals on sample tabs. The release
 needs no Python, companion, terminal, or checkout. Never include credentials in the ZIP or listing.
 Run make dev for local setup, or make dev-isolated for a separate development Chrome profile. Add the API key in the
-extension settings, as in the release. Reload the extension after edits; development needs no ZIP.
+extension settings, as in the release. Use npm run dev to rebuild on edits, then reload the extension. Development needs no ZIP.
 
 Owner-only distribution
 

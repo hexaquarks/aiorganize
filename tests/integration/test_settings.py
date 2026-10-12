@@ -71,8 +71,8 @@ class ConnectionSetupTest(PanelTestCase):
                 await expect(self.panel.locator("#advanced")).to_have_count(0)
                 await expect(self.panel.locator("#api-model")).to_be_enabled()
                 await expect(self.panel.locator("#organize")).to_be_disabled()
-                settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
-                self.assertEqual(settings["model"], "gpt-6.1-sol")
+                settings = await self.read_settings()
+                self.assertEqual(await self.panel.locator("#api-model").evaluate("element => element.value"), "gpt-6.1-sol")
                 self.assertEqual(settings["apiKey"], local_settings.get("apiKey") or
                                  local_settings.get("connection", {}).get("apiKey", ""))
 
@@ -89,7 +89,7 @@ class ConnectionSetupTest(PanelTestCase):
         await expect(self.panel.locator("#ready")).to_be_visible()
         await expect(self.panel.locator("#connection-detail")).to_contain_text("gpt-4o-mini")
         await expect(self.panel.locator("#organize")).to_be_enabled()
-        settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        settings = await self.read_settings()
         self.assertEqual(settings["model"], connection["model"])
         self.assertEqual(settings["verifiedAt"], connection["verifiedAt"])
 
@@ -140,7 +140,7 @@ class ConnectionSetupTest(PanelTestCase):
 
     async def test_failed_replacements_preserve_working_connection(self):
         await self.connect(remember=True)
-        before = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        before = await self.read_settings()
         stores = await self.panel.evaluate("""async () => ({
             local: await chrome.storage.local.get(), session: await chrome.storage.session.get(),
         })""")
@@ -167,7 +167,7 @@ class ConnectionSetupTest(PanelTestCase):
             await expect(self.panel.locator("#settings-status")).to_contain_text(message)
             await expect(self.panel.locator("#settings-status")).to_contain_text(action)
             self.assertNotIn("DO NOT SHOW SECRET", await self.panel.locator("#settings-status").inner_text())
-            current = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+            current = await self.read_settings()
             self.assertEqual(before, current)
         await self.panel.locator("#cancel-settings").click()
         await expect(self.panel.locator("#organize")).to_be_enabled()
@@ -188,7 +188,7 @@ class ConnectionSetupTest(PanelTestCase):
         await self.panel.evaluate("window.finishValidation = true")
         await expect(self.panel.locator("#settings-status")).to_contain_text("Could not verify")
         await expect(self.panel.locator("#organize")).to_be_disabled()
-        settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        settings = await self.read_settings()
         self.assertFalse(settings["apiKey"])
 
     async def test_network_and_timeout_feedback(self):
@@ -206,16 +206,16 @@ class ConnectionSetupTest(PanelTestCase):
 
     async def test_model_change_requires_validation_and_selected_model_is_used(self):
         await self.connect()
-        before = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        before = await self.read_settings()
         await self.panel.locator("#edit-connection").click()
         await self.panel.locator("#api-model").click()
         await self.panel.get_by_role("option", name="GPT-5.5", exact=True).click()
         await expect(self.panel.locator("#organize")).to_be_disabled()
-        current = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        current = await self.read_settings()
         self.assertEqual(before, current)
         await self.panel.locator("#test-connection").click()
         await expect(self.panel.locator("#ready")).to_be_visible()
-        settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        settings = await self.read_settings()
         self.assertEqual(settings["model"], "gpt-5.5")
         await expect(self.panel.locator("#connection-detail")).to_contain_text("GPT-5.5")
 
