@@ -13,4 +13,6 @@ store-status:
 	uv run --env-file .env python -m src.webstore status
 
 test:
+	npm run check
+	npm run build
 	uv run python -m unittest discover -s tests

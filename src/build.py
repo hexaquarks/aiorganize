@@ -5,19 +5,39 @@ import hashlib
 import io
 import json
 import re
+import shutil
 import subprocess
 import tarfile
+import tempfile
 from pathlib import Path
 from zipfile import ZIP_STORED, ZipFile, ZipInfo
 
 
 PROJECT = Path(__file__).resolve().parents[1]
 # An explicit list prevents local configuration and development utilities entering releases.
-EXTENSION_FILES = (
+LEGACY_EXTENSION_FILES = (
     "background.js", "manifest.json", "panel.css", "panel.html",
     "panel.js", "llm.js", "tabs.js",
     "settings.js", "model-picker.js", "models.js", "model-catalog.js", "proposal.js", "icons/brand.png",
 )
+
+EXTENSION_FILES = (
+    "runtime/background.js", "manifest.json", "runtime/panel.css", "panel.html",
+    "runtime/panel.js", "icons/brand.png", "LICENSE",
+)
+COMPILED_EXTENSION = PROJECT / "dist" / "extension"
+
+
+def build_frontend(project: Path = PROJECT, *, install: bool = False) -> dict[str, bytes]:
+    npm = shutil.which("npm")
+    if npm is None:
+        raise ValueError("npm not found.")
+    if install:
+        subprocess.run([npm, "ci"], cwd=project, check=True)
+    subprocess.run([npm, "run", "build"], cwd=project, check=True)
+
+    directory = project / "dist" / "extension"
+    return {name: (directory / name).read_bytes() for name in EXTENSION_FILES}
 
 
 def chrome_version(version: str) -> tuple[int, ...]:
@@ -41,7 +61,7 @@ def build_zip(files: dict[str, bytes], tag: str, previous_versions: list[str]) -
 
     output = io.BytesIO()
     with ZipFile(output, "w", compression=ZIP_STORED) as archive:
-        for name in sorted(EXTENSION_FILES):
+        for name in sorted(LEGACY_EXTENSION_FILES if "settings.js" in files else EXTENSION_FILES):
             data = files[name]
             entry = ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             entry.create_system = 3
@@ -57,18 +77,28 @@ def git(*arguments: str) -> bytes:
 
 
 def tagged_files(tag: str) -> dict[str, bytes]:
-    """Read committed bytes without using, changing, or cleaning the working tree."""
-    ref = f"refs/tags/{tag}"
-    archive_bytes = git("archive", "--format=tar", ref, "extension")
-    files = {}
+    """Build an isolated tagged checkout, preserving the current working tree."""
+    archive_bytes = git("archive", "--format=tar", f"refs/tags/{tag}")
     with tarfile.open(fileobj=io.BytesIO(archive_bytes)) as archive:
-        for name in EXTENSION_FILES:
+        members = {member.name: member for member in archive.getmembers()}
+        if any(member.issym() or member.islnk() for member in members.values()):
+            raise ValueError("Release assets must be regular files.")
+
+        if "package.json" in members:
+            with tempfile.TemporaryDirectory(prefix="aiorganize-release-") as directory:
+                archive.extractall(directory, filter="data")
+                return build_frontend(Path(directory), install=True)
+
+        # Older tags predate the frontend compiler and contain browser-ready JavaScript.
+        names = LEGACY_EXTENSION_FILES if "extension/settings.js" in members else EXTENSION_FILES
+        files = {}
+        for name in names:
             member = archive.getmember(f"extension/{name}")
             if not member.isfile():
                 raise ValueError(f"Release assets must be regular files: {name}")
             with archive.extractfile(member) as source:
                 files[name] = source.read()
-    return files
+        return files
 
 
 def main() -> None:
@@ -82,12 +112,10 @@ def main() -> None:
 
     try:
         if args.preview:
-            files = {}
-            for name in EXTENSION_FILES:
-                path = PROJECT / "extension" / name
-                if any(part.is_symlink() for part in (path, *path.parents)):
-                    raise ValueError(f"Release assets must not use symlinks: {name}")
-                files[name] = path.read_bytes()
+            source_dir = PROJECT / "extension"
+            if any(path.is_symlink() for path in source_dir.rglob("*")):
+                raise ValueError("Release assets must not use symlinks.")
+            files = build_frontend(PROJECT)
             tag = "v" + json.loads(files["manifest.json"])["version"]
             ancestors = git("tag", "--merged", "HEAD").decode().splitlines()
         else:

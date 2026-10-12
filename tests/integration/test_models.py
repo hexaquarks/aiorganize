@@ -51,7 +51,7 @@ class ModelDiscoveryTest(PanelTestCase):
         self.assertIsNone(requests[0].post_data)
         await self.panel.get_by_role("option", name="GPT-5 Mini", exact=True).click()
         await expect(self.panel.locator("#organize")).to_be_disabled()
-        settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        settings = await self.read_settings()
         self.assertFalse(settings["apiKey"])
         await self.panel.locator("#api-model").click()
         await expect(self.panel.get_by_role("option", name="GPT-5 Mini", exact=True)).to_be_focused()
@@ -77,7 +77,7 @@ class ModelDiscoveryTest(PanelTestCase):
         await expect(self.panel.locator("#ready")).to_be_visible()
         self.assertEqual(validation_requests[0]["model"], "gpt-5-mini")
         self.assertEqual(len(json.loads(validation_requests[0]["input"])["tabs"]), 2)
-        settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        settings = await self.read_settings()
         self.assertEqual(settings["model"], "gpt-5-mini")
         await expect(self.panel.locator("#organize")).to_be_enabled()
 
@@ -103,7 +103,7 @@ class ModelDiscoveryTest(PanelTestCase):
 
     async def test_discovery_failure_does_not_replace_working_settings(self):
         await self.connect()
-        before = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        before = await self.read_settings()
         await self.panel.unroute("https://api.openai.com/v1/models")
         count = 0
 
@@ -120,7 +120,7 @@ class ModelDiscoveryTest(PanelTestCase):
         await expect(self.panel.get_by_role("option", name="GPT-6.1 Sol", exact=True)).to_be_visible()
         await expect(self.panel.locator("#model-discovery-status")).to_contain_text("OpenAI denied model-list access (403)")
         self.assertGreaterEqual(count, 2)
-        current = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        current = await self.read_settings()
         self.assertEqual(before, current)
         await self.panel.locator("#cancel-settings").click()
         await expect(self.panel.locator("#organize")).to_be_enabled()
@@ -207,7 +207,7 @@ class ModelDiscoveryTest(PanelTestCase):
         await self.panel.route("https://api.openai.com/v1/models", respond)
         await expect(self.panel.locator("#api-key")).to_be_empty()
         await expect(self.panel.locator("#api-model")).to_contain_text("GPT-6.1 Sol")
-        settings = await self.panel.evaluate("async () => (await import('./settings.js')).getSettings()")
+        settings = await self.read_settings()
         self.assertEqual(settings["model"], "gpt-6.1-sol")
         await self.panel.locator("#api-model").click()
         options = self.panel.get_by_role("option")
