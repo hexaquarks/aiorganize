@@ -6,8 +6,8 @@
 		"build": "vite build",
 		"dev": "vite build --watch",
 		"check": "svelte-check --tsconfig ./tsconfig.json",
-		"format": "prettier --write extension vite.config.ts svelte.config.js tsconfig.json package.json .prettierrc.json",
-		"format:check": "prettier --check extension vite.config.ts svelte.config.js tsconfig.json package.json .prettierrc.json"
+		"format": "prettier --write extension 'tests/**/*.{ts,mjs}' vite.config.ts svelte.config.js tsconfig.json package.json .prettierrc.json",
+		"format:check": "prettier --check extension 'tests/**/*.{ts,mjs}' vite.config.ts svelte.config.js tsconfig.json package.json .prettierrc.json"
 	},
 	"devDependencies": {
 		"@sveltejs/vite-plugin-svelte": "^7.3.1",
