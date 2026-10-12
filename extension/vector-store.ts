@@ -4,9 +4,9 @@ import { embedTexts, EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "./embeddings"
 import { normalizeQdrantUrl } from "./qdrant";
 import { isRecord, requestVectorJson, validateApiKey } from "./vector-http";
 
-export const MEMORY_COLLECTION = "aiorganize_groups_v1_text_embedding_3_small_1536";
+export const SAVED_GROUPINGS_COLLECTION = "aiorganize_groups_v1_text_embedding_3_small_1536";
 const SCHEMA_VERSION = 1;
-const MEMORY_INDEXES = [
+const SAVED_GROUPINGS_INDEXES = [
 	{ field_name: "schemaVersion", field_schema: "integer" },
 	{ field_name: "embeddingModel", field_schema: "keyword" },
 	{ field_name: "embeddingDimensions", field_schema: "integer" },
@@ -18,7 +18,7 @@ export interface ApprovedGroup {
 	approvedAt: string;
 }
 
-export interface GroupMemory extends ApprovedGroup {
+export interface SavedGrouping extends ApprovedGroup {
 	schemaVersion: number;
 	embeddingModel: string;
 	embeddingDimensions: number;
@@ -27,7 +27,7 @@ export interface GroupMemory extends ApprovedGroup {
 export interface GroupMatch {
 	id: string;
 	score: number;
-	memory: GroupMemory;
+	savedGrouping: SavedGrouping;
 }
 
 export class GroupingVectorStore {
@@ -49,14 +49,14 @@ export class GroupingVectorStore {
 			throw new Error("Invalid approved groups. Include a name, pages, and approval timestamp.");
 		}
 
-		// Keep only memory fields before hashing, embedding, or uploading caller objects.
-		const memories = groups.map(memoryPayload);
-		const texts = memories.map(groupText);
+		// Keep only saved grouping fields before hashing, embedding, or uploading caller objects.
+		const savedGroupings = groups.map(savedGroupingPayload);
+		const texts = savedGroupings.map(groupText);
 
 		this.validateConnection();
 		let collection = await this.readCollection(signal);
 		const vectors = await embedTexts(texts, this.apiKey, signal);
-		const ids = await Promise.all(texts.map(memoryId));
+		const ids = await Promise.all(texts.map(savedGroupingId));
 
 		// Validate embeddings before creating a collection or making any database write.
 		if (!collection) {
@@ -65,12 +65,14 @@ export class GroupingVectorStore {
 
 		await this.ensureIndexes(collection, signal);
 
-		const points = memories.map((payload, index) => ({ id: ids[index], vector: vectors[index], payload }));
+		const points = savedGroupings.map((payload, index) => ({ id: ids[index], vector: vectors[index], payload }));
 		const { body } = await this.request("/points?wait=true", "PUT", { points }, signal);
 		const result = qdrantResult(body);
 
 		if (!isRecord(result) || result.status !== "completed") {
-			throw new Error("Qdrant did not confirm the memory save. Retry to confirm it without duplicating records.");
+			throw new Error(
+				"Qdrant did not confirm saving the groupings. Retry to confirm it without duplicating records.",
+			);
 		}
 
 		return ids;
@@ -78,11 +80,11 @@ export class GroupingVectorStore {
 
 	async search(query: string, limit = 5, signal?: AbortSignal): Promise<GroupMatch[]> {
 		if (typeof query !== "string" || !query.trim()) {
-			throw new Error("Enter a nonempty memory search query.");
+			throw new Error("Enter a nonempty saved grouping search query.");
 		}
 
 		if (!Number.isInteger(limit) || limit < 1 || limit > 20) {
-			throw new Error("Memory search limit must be between 1 and 20.");
+			throw new Error("Saved grouping search limit must be between 1 and 20.");
 		}
 
 		this.validateConnection();
@@ -94,7 +96,7 @@ export class GroupingVectorStore {
 		}
 
 		if (missingIndexes(collection).length) {
-			throw new Error("Memory search indexes are missing. Save an approved group to finish setup.");
+			throw new Error("Saved grouping search indexes are missing. Save an approved group to finish setup.");
 		}
 
 		const [vector] = await embedTexts([query], this.apiKey, signal);
@@ -137,7 +139,7 @@ export class GroupingVectorStore {
 			const payload = point.payload;
 
 			if (!isRecord(payload)) {
-				throw new Error("Qdrant returned an invalid memory record.");
+				throw new Error("Qdrant returned an invalid saved grouping record.");
 			}
 
 			const compatible =
@@ -150,10 +152,10 @@ export class GroupingVectorStore {
 			}
 
 			if (!isApprovedGroup(payload)) {
-				throw new Error("Qdrant returned an invalid memory record.");
+				throw new Error("Qdrant returned an invalid saved grouping record.");
 			}
 
-			matches.push({ id: point.id, score: point.score, memory: memoryPayload(payload) });
+			matches.push({ id: point.id, score: point.score, savedGrouping: savedGroupingPayload(payload) });
 		}
 
 		return matches;
@@ -161,7 +163,7 @@ export class GroupingVectorStore {
 
 	private validateConnection() {
 		if (!this.connection.verifiedAt) {
-			throw new Error("Test and save your Qdrant connection before using memory.");
+			throw new Error("Test and save your Qdrant connection before using saved groupings.");
 		}
 
 		normalizeQdrantUrl(this.connection.url);
@@ -183,7 +185,7 @@ export class GroupingVectorStore {
 		const compatible = isRecord(vectors) && vectors.size === EMBEDDING_DIMENSIONS && vectors.distance === "Cosine";
 
 		if (!compatible || !isRecord(result)) {
-			throw new Error("The Qdrant memory collection is incompatible. Existing data has been preserved.");
+			throw new Error("The Qdrant saved groupings collection is incompatible. Existing data has been preserved.");
 		}
 
 		missingIndexes(result);
@@ -207,7 +209,9 @@ export class GroupingVectorStore {
 			const collection = await this.readCollection(signal);
 
 			if (!collection) {
-				throw new Error("Qdrant could not create the memory collection. Check write access and try again.");
+				throw new Error(
+					"Qdrant could not create the saved groupings collection. Check write access and try again.",
+				);
 			}
 
 			return collection;
@@ -227,7 +231,7 @@ export class GroupingVectorStore {
 			const result = qdrantResult(body);
 
 			if (!isRecord(result) || result.status !== "completed") {
-				throw new Error("Qdrant did not confirm memory index setup. Try saving again.");
+				throw new Error("Qdrant did not confirm saved grouping index setup. Try saving again.");
 			}
 		}
 	}
@@ -243,7 +247,7 @@ export class GroupingVectorStore {
 		const key = validateApiKey(this.connection.apiKey, "Qdrant");
 
 		return requestVectorJson(
-			`${url}/collections/${MEMORY_COLLECTION}${path}`,
+			`${url}/collections/${SAVED_GROUPINGS_COLLECTION}${path}`,
 			{
 				method,
 				headers: { "api-key": key, "Content-Type": "application/json" },
@@ -260,12 +264,12 @@ function missingIndexes(collection: Record<string, unknown> | null) {
 	const schema = collection?.payload_schema ?? {};
 
 	if (!isRecord(schema)) {
-		throw new Error("Qdrant returned an invalid memory index schema.");
+		throw new Error("Qdrant returned an invalid saved grouping index schema.");
 	}
 
 	const missing = [];
 
-	for (const index of MEMORY_INDEXES) {
+	for (const index of SAVED_GROUPINGS_INDEXES) {
 		const existing = schema[index.field_name];
 
 		if (existing === undefined) {
@@ -274,7 +278,7 @@ function missingIndexes(collection: Record<string, unknown> | null) {
 		}
 
 		if (!isRecord(existing) || existing.data_type !== index.field_schema) {
-			throw new Error("The Qdrant memory index is incompatible. Existing data has been preserved.");
+			throw new Error("The Qdrant saved grouping index is incompatible. Existing data has been preserved.");
 		}
 	}
 
@@ -312,7 +316,7 @@ function isApprovedGroup(value: unknown): value is ApprovedGroup {
 	);
 }
 
-function memoryPayload(group: ApprovedGroup): GroupMemory {
+function savedGroupingPayload(group: ApprovedGroup): SavedGrouping {
 	return {
 		schemaVersion: SCHEMA_VERSION,
 		embeddingModel: EMBEDDING_MODEL,
@@ -330,12 +334,12 @@ function groupText(group: ApprovedGroup): string {
 	return JSON.stringify({ name: group.name, pages: pages.map((page) => JSON.parse(page)) });
 }
 
-async function memoryId(text: string): Promise<string> {
+async function savedGroupingId(text: string): Promise<string> {
 	// UUID v5 uses SHA-1 with a namespace; Qdrant accepts UUID point IDs for idempotent upserts.
 	const namespace = new Uint8Array([
 		0x6b, 0xa7, 0xb8, 0x11, 0x9d, 0xad, 0x11, 0xd1, 0x80, 0xb4, 0x00, 0xc0, 0x4f, 0xd4, 0x30, 0xc8,
 	]);
-	const name = new TextEncoder().encode(`${MEMORY_COLLECTION}:${text}`);
+	const name = new TextEncoder().encode(`${SAVED_GROUPINGS_COLLECTION}:${text}`);
 	const input = new Uint8Array(namespace.length + name.length);
 
 	input.set(namespace);

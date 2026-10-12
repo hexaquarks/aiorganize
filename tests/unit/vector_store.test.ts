@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
 import { embedTexts, EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../../extension/embeddings";
-import { GroupingVectorStore, MEMORY_COLLECTION } from "../../extension/vector-store";
+import { GroupingVectorStore, SAVED_GROUPINGS_COLLECTION } from "../../extension/vector-store";
 
 const connection = {
 	url: "https://test.cloud.qdrant.io:6333/",
@@ -125,7 +125,7 @@ test("missing collection is created, then groups are saved with isolated credent
 
 	const writes = requests.filter((request) => request.method === "PUT");
 	assert.equal(writes.length, 5);
-	assert.equal(writes[0].url, `${connection.url.slice(0, -1)}/collections/${MEMORY_COLLECTION}`);
+	assert.equal(writes[0].url, `${connection.url.slice(0, -1)}/collections/${SAVED_GROUPINGS_COLLECTION}`);
 	assert.deepEqual(writes[0].body, { vectors: { size: 1536, distance: "Cosine" } });
 	assert.deepEqual(
 		writes.slice(1, 4).map((request) => request.body),
@@ -238,6 +238,8 @@ test("search sends a bounded query with schema/model filtering and preserves ran
 	});
 
 	const matches = await store().search("Python development", 3);
+
+	assert.deepEqual(matches[0].savedGrouping, savedPayload());
 
 	assert.deepEqual(
 		matches.map((match) => [match.id, match.score]),

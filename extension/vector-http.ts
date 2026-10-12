@@ -46,7 +46,7 @@ export async function requestVectorJson(
 
 		// Provider error bodies may contain keys or page data; never surface their messages.
 		if (response.status === 401 || response.status === 403) {
-			const requiredAccess = service === "OpenAI" ? "embeddings" : "the memory collection";
+			const requiredAccess = service === "OpenAI" ? "embeddings" : "the saved groupings collection";
 
 			throw new Error(`${service} key rejected. Check access to ${requiredAccess}.`);
 		}
@@ -76,7 +76,7 @@ export async function requestVectorJson(
 		}
 
 		if (requestSignal.aborted) {
-			throw new DOMException("Memory request cancelled.", "AbortError");
+			throw new DOMException("Saved groupings request cancelled.", "AbortError");
 		}
 
 		if (error instanceof TypeError) {
