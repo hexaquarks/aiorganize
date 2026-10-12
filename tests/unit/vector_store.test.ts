@@ -4,6 +4,9 @@ import { afterEach, test } from "vitest";
 import { embedTexts, EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "../../extension/embeddings";
 import { GroupingVectorStore, SAVED_GROUPINGS_COLLECTION } from "../../extension/vector-store";
 
+const userId = "661f4c48-e00e-4d83-8126-a3a78fd3dd10";
+const otherUserId = "e8bbb44b-3c47-4d79-9647-dfe3d547989c";
+
 const connection = {
 	url: "https://test.cloud.qdrant.io:6333/",
 	apiKey: "qdrant-test-key",
@@ -23,6 +26,7 @@ const originalTimeout = AbortSignal.timeout;
 const vector = (): number[] => Array.from({ length: EMBEDDING_DIMENSIONS }, (_, index) => (index === 0 ? 1 : 0));
 const ok = (result: unknown) => Response.json({ status: "ok", result });
 const payloadSchema = {
+	userId: { data_type: "keyword" },
 	schemaVersion: { data_type: "integer" },
 	embeddingModel: { data_type: "keyword" },
 	embeddingDimensions: { data_type: "integer" },
@@ -60,11 +64,12 @@ function mockNetwork(respond: (request: Request) => Response | Promise<Response>
 }
 
 function store() {
-	return new GroupingVectorStore(connection, "openai-test-key");
+	return new GroupingVectorStore(connection, "openai-test-key", userId);
 }
 
 function savedPayload(overrides = {}) {
 	return {
+		userId,
 		schemaVersion: 1,
 		embeddingModel: EMBEDDING_MODEL,
 		embeddingDimensions: EMBEDDING_DIMENSIONS,
@@ -124,22 +129,23 @@ test("missing collection is created, then groups are saved with isolated credent
 	const ids = await store().saveGroups([group, other]);
 
 	const writes = requests.filter((request) => request.method === "PUT");
-	assert.equal(writes.length, 5);
+	assert.equal(writes.length, 6);
 	assert.equal(writes[0].url, `${connection.url.slice(0, -1)}/collections/${SAVED_GROUPINGS_COLLECTION}`);
 	assert.deepEqual(writes[0].body, { vectors: { size: 1536, distance: "Cosine" } });
 	assert.deepEqual(
-		writes.slice(1, 4).map((request) => request.body),
+		writes.slice(1, 5).map((request) => request.body),
 		[
+			{ field_name: "userId", field_schema: "keyword" },
 			{ field_name: "schemaVersion", field_schema: "integer" },
 			{ field_name: "embeddingModel", field_schema: "keyword" },
 			{ field_name: "embeddingDimensions", field_schema: "integer" },
 		],
 	);
-	assert.equal(writes[4].body.points.length, 2);
-	assert.deepEqual(writes[4].body.points[0].payload, savedPayload());
-	assert.deepEqual(writes[4].body.points[0].vector, vector());
+	assert.equal(writes[5].body.points.length, 2);
+	assert.deepEqual(writes[5].body.points[0].payload, savedPayload());
+	assert.deepEqual(writes[5].body.points[0].vector, vector());
 	assert.deepEqual(
-		writes[4].body.points.map((point: any) => point.id),
+		writes[5].body.points.map((point: any) => point.id),
 		ids,
 	);
 	assert.match(ids[0], /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
@@ -170,9 +176,6 @@ test("reusing a collection and retrying a save does not create duplicate identit
 	});
 
 	const first = await store().saveGroups([group]);
-
-	// Preserve IDs produced before switching to the UUID package.
-	assert.equal(first[0], "0e6d2b7b-9e48-551e-bfe5-a204bbf0c23a");
 
 	const retry = await store().saveGroups([
 		{ ...group, pages: [...group.pages].reverse(), approvedAt: "2026-10-13T00:00:00Z" },
@@ -261,6 +264,7 @@ test("search sends a bounded query with schema/model filtering and preserves ran
 		with_vector: false,
 		filter: {
 			must: [
+				{ key: "userId", match: { value: userId } },
 				{ key: "schemaVersion", match: { value: 1 } },
 				{ key: "embeddingModel", match: { value: EMBEDDING_MODEL } },
 				{ key: "embeddingDimensions", match: { value: 1536 } },
@@ -325,14 +329,14 @@ test("invalid inputs and credentials fail before network access", async () => {
 	await assert.rejects(embedTexts([""], "openai-test-key"), /input/i);
 	await assert.rejects(embedTexts(["Python"], "bad\nkey"), /key/i);
 	await assert.rejects(
-		new GroupingVectorStore({ ...connection, url: "https://evil.test" }, "key").saveGroups([group]),
+		new GroupingVectorStore({ ...connection, url: "https://evil.test" }, "key", userId).saveGroups([group]),
 	);
 	await assert.rejects(
-		new GroupingVectorStore({ ...connection, verifiedAt: null }, "key").saveGroups([group]),
+		new GroupingVectorStore({ ...connection, verifiedAt: null }, "key", userId).saveGroups([group]),
 		/connection/i,
 	);
 	await assert.rejects(
-		new GroupingVectorStore({ ...connection, apiKey: "bad\nkey" }, "key").saveGroups([group]),
+		new GroupingVectorStore({ ...connection, apiKey: "bad\nkey" }, "key", userId).saveGroups([group]),
 		/key/i,
 	);
 	assert.deepEqual(await store().saveGroups([]), []);
@@ -356,7 +360,7 @@ test("API failures are sanitized for both services", async () => {
 	}
 });
 
-test("sorting page objects preserves existing IDs and does not change caller page order", async () => {
+test("sorting page objects preserves scoped IDs and does not change caller page order", async () => {
 	mockNetwork((request) => {
 		if (request.url.includes("openai.com")) {
 			return embeddingResponse();
@@ -374,7 +378,7 @@ test("sorting page objects preserves existing IDs and does not change caller pag
 	const ids = await store().saveGroups([{ ...group, pages }]);
 	const reorderedIds = await store().saveGroups([{ ...group, pages: [...pages].reverse() }]);
 
-	assert.deepEqual(ids, ["cb477791-97c2-578f-8366-0d78a0c695cf"]);
+	assert.equal(ids.length, 1);
 	assert.deepEqual(reorderedIds, ids);
 	assert.deepEqual(pages, originalPages);
 });
@@ -433,7 +437,7 @@ test("missing payload indexes are repaired before saving, without replacing exis
 	const indexes = requests.filter((request) => request.url.endsWith("/index?wait=true"));
 	assert.deepEqual(
 		indexes.map((request) => request.body.field_name),
-		["schemaVersion", "embeddingDimensions"],
+		["userId", "schemaVersion", "embeddingDimensions"],
 	);
 	assert.equal(requests.at(-1)?.url.endsWith("/points?wait=true"), true);
 });
@@ -587,4 +591,53 @@ test("search with missing indexes stays read-only and reports how to finish setu
 	await assert.rejects(store().search("Python"), /indexes are missing/);
 	assert.equal(requests.length, 1);
 	assert.equal(requests[0].method, "GET");
+});
+
+test("identical groups belonging to different users have distinct IDs", async () => {
+	mockNetwork((request) => {
+		if (request.url.includes("openai.com")) {
+			return embeddingResponse();
+		}
+
+		return request.method === "GET" ? compatibleCollection() : ok({ status: "completed" });
+	});
+	const otherStore = new GroupingVectorStore(connection, "openai-test-key", otherUserId);
+
+	const first = await store().saveGroups([group]);
+	const second = await otherStore.saveGroups([group]);
+
+	assert.notDeepEqual(first, second);
+	assert.deepEqual(await store().saveGroups([group]), first);
+});
+
+test("search rejects another user's payload and ownerless legacy payloads even if returned by the database", async () => {
+	mockNetwork((request) => {
+		if (request.url.includes("openai.com")) {
+			return embeddingResponse();
+		}
+
+		if (request.method === "GET") {
+			return compatibleCollection();
+		}
+
+		return ok({
+			points: [
+				{ id: "other-user", score: 1, payload: savedPayload({ userId: otherUserId }) },
+				{ id: "legacy", score: 0.9, payload: savedPayload({ userId: undefined }) },
+				{ id: "own", score: 0.8, payload: savedPayload() },
+			],
+		});
+	});
+
+	const matches = await store().search("Python", 3);
+
+	assert.deepEqual(
+		matches.map((match) => match.id),
+		["own"],
+	);
+});
+
+test("missing or invalid user identities cannot access saved groups", () => {
+	assert.throws(() => new GroupingVectorStore(connection, "key", ""), /identity/);
+	assert.throws(() => new GroupingVectorStore(connection, "key", "not-a-user-id"), /identity/);
 });

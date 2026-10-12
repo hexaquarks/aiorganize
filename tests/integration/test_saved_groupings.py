@@ -18,6 +18,10 @@ class SavedGroupingsTest(PanelTestCase):
         self.write_status = write_status
         self.embedding_status = embedding_status
         self.saved_points = {}
+        self.user_id = "661f4c48-e00e-4d83-8126-a3a78fd3dd10"
+        await self.panel.evaluate(
+            "userId => chrome.storage.local.set({savedGroupingsUserId: userId})", self.user_id,
+        )
         self.query_status = 200
         self.query_result = None
 
@@ -48,6 +52,7 @@ class SavedGroupingsTest(PanelTestCase):
                 await route.fulfill(json={"status": "ok", "result": {
                     "config": {"params": {"vectors": {"size": 1536, "distance": "Cosine"}}},
                     "payload_schema": {
+                        "userId": {"data_type": "keyword"},
                         "schemaVersion": {"data_type": "integer"},
                         "embeddingModel": {"data_type": "keyword"},
                         "embeddingDimensions": {"data_type": "integer"},
@@ -62,9 +67,11 @@ class SavedGroupingsTest(PanelTestCase):
 
                 result = self.query_result
                 if result is None:
+                    query_user = request.post_data_json["filter"]["must"][0]["match"]["value"]
                     result = {"points": [
                         {"id": point["id"], "score": 0.9, "payload": point["payload"]}
                         for point in self.saved_points.values()
+                        if point["payload"].get("userId") == query_user
                     ]}
                 await route.fulfill(json={"status": "ok", "result": result})
                 return
@@ -116,8 +123,9 @@ class SavedGroupingsTest(PanelTestCase):
         for point in points:
             payload = point["payload"]
             self.assertEqual(set(payload), {
-                "name", "pages", "approvedAt", "schemaVersion", "embeddingModel", "embeddingDimensions",
+                "userId", "name", "pages", "approvedAt", "schemaVersion", "embeddingModel", "embeddingDimensions",
             })
+            self.assertEqual(payload["userId"], self.user_id)
             datetime.fromisoformat(payload["approvedAt"])
         uploaded = json.dumps([self.embedding_requests, writes])
         for excluded in (PRIVATE_PAGE_TEXT, "qdrant-test-key", "test-secret", "chrome_id", "tab-"):

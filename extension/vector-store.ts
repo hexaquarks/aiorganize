@@ -1,6 +1,6 @@
 import type { QdrantConnection } from "./types";
 
-import { v5 as uuidv5 } from "uuid";
+import { v5 as uuidv5, validate as isUuid } from "uuid";
 import { QdrantClient } from "@qdrant/js-client-rest";
 
 import { embedTexts, EMBEDDING_DIMENSIONS, EMBEDDING_MODEL } from "./embeddings";
@@ -12,6 +12,7 @@ export const SAVED_GROUPINGS_COLLECTION =
 	import.meta.env.MODE === "qdrant-test" ? `${USER_COLLECTION}_test` : USER_COLLECTION;
 const SCHEMA_VERSION = 1;
 const SAVED_GROUPINGS_INDEXES = [
+	{ field_name: "userId", field_schema: "keyword" },
 	{ field_name: "schemaVersion", field_schema: "integer" },
 	{ field_name: "embeddingModel", field_schema: "keyword" },
 	{ field_name: "embeddingDimensions", field_schema: "integer" },
@@ -24,6 +25,7 @@ export interface ApprovedGroup {
 }
 
 export interface SavedGrouping extends ApprovedGroup {
+	userId: string;
 	schemaVersion: number;
 	embeddingModel: string;
 	embeddingDimensions: number;
@@ -38,10 +40,16 @@ export interface GroupMatch {
 export class GroupingVectorStore {
 	private readonly connection: QdrantConnection;
 	private readonly apiKey: string;
+	private readonly userId: string;
 
-	constructor(connection: QdrantConnection, apiKey: string) {
+	constructor(connection: QdrantConnection, apiKey: string, userId: string) {
+		if (!isUuid(userId)) {
+			throw new Error("A valid user identity is required for saved groupings.");
+		}
+
 		this.connection = { ...connection };
 		this.apiKey = apiKey;
+		this.userId = userId;
 	}
 
 	// The caller must supply only groups whose application in Chrome completed successfully.
@@ -55,13 +63,13 @@ export class GroupingVectorStore {
 		}
 
 		// Keep only saved grouping fields before hashing, embedding, or uploading caller objects.
-		const savedGroupings = groups.map(savedGroupingPayload);
+		const savedGroupings = groups.map((group) => savedGroupingPayload(group, this.userId));
 		const texts = savedGroupings.map(groupText);
 
 		const client = this.client();
 		let collection = await this.readCollection(client, signal);
 		const vectors = await embedTexts(texts, this.apiKey, signal);
-		const ids = texts.map(savedGroupingId);
+		const ids = texts.map((text) => savedGroupingId(text, this.userId));
 
 		// Validate embeddings before creating a collection or making any database write.
 		if (!collection) {
@@ -128,6 +136,7 @@ export class GroupingVectorStore {
 					with_vector: false,
 					filter: {
 						must: [
+							{ key: "userId", match: { value: this.userId } },
 							{ key: "schemaVersion", match: { value: SCHEMA_VERSION } },
 							{ key: "embeddingModel", match: { value: EMBEDDING_MODEL } },
 							{ key: "embeddingDimensions", match: { value: EMBEDDING_DIMENSIONS } },
@@ -161,6 +170,11 @@ export class GroupingVectorStore {
 				throw new Error("Qdrant returned an invalid saved grouping record.");
 			}
 
+			// Never pass another user's record or older records without an owner to the model.
+			if (payload.userId !== this.userId) {
+				continue;
+			}
+
 			const compatible =
 				payload.schemaVersion === SCHEMA_VERSION &&
 				payload.embeddingModel === EMBEDDING_MODEL &&
@@ -174,7 +188,11 @@ export class GroupingVectorStore {
 				throw new Error("Qdrant returned an invalid saved grouping record.");
 			}
 
-			matches.push({ id: point.id, score: point.score, savedGrouping: savedGroupingPayload(payload) });
+			matches.push({
+				id: point.id,
+				score: point.score,
+				savedGrouping: savedGroupingPayload(payload, this.userId),
+			});
 		}
 
 		return matches;
@@ -356,8 +374,9 @@ function isApprovedGroup(value: unknown): value is ApprovedGroup {
 	);
 }
 
-function savedGroupingPayload(group: ApprovedGroup): SavedGrouping {
+function savedGroupingPayload(group: ApprovedGroup, userId: string): SavedGrouping {
 	return {
+		userId,
 		schemaVersion: SCHEMA_VERSION,
 		embeddingModel: EMBEDDING_MODEL,
 		embeddingDimensions: EMBEDDING_DIMENSIONS,
@@ -386,7 +405,7 @@ function groupText(group: ApprovedGroup): string {
 	return JSON.stringify({ name: group.name, pages });
 }
 
-function savedGroupingId(text: string): string {
+function savedGroupingId(text: string, userId: string): string {
 	// The same grouping gets the same ID, so retries update it instead of creating duplicates.
-	return uuidv5(`${SAVED_GROUPINGS_COLLECTION}:${text}`, uuidv5.URL);
+	return uuidv5(`${SAVED_GROUPINGS_COLLECTION}:${userId}:${text}`, uuidv5.URL);
 }

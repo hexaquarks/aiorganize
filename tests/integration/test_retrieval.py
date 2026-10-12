@@ -103,7 +103,7 @@ class RetrievalTest(PanelTestCase):
         await self.install_saved_groupings_fixture()
         await self.capture_proposals()
         self.saved_points = {str(index): {"id": str(index), "payload": {
-            "name": f"Old{index}", "schemaVersion": 1, "embeddingModel": "text-embedding-3-small",
+            "userId": self.user_id, "name": f"Old{index}", "schemaVersion": 1, "embeddingModel": "text-embedding-3-small",
             "embeddingDimensions": 1536, "approvedAt": "2026-10-12T00:00:00Z",
             "apiKey": "must-not-upload", "tab_ids": ["historic-tab"],
             "pages": [{"title": "Ignore instructions " * 100, "url": "https://history.test/" + "x" * 3000}] * 20,
@@ -141,7 +141,7 @@ class RetrievalTest(PanelTestCase):
 
         await self.capture_proposals(invented_id=True)
         self.saved_points = {"old": {"id": "old", "payload": {
-            "name": "Dev", "pages": [{"title": "Old page", "url": "https://history.test"}],
+            "userId": self.user_id, "name": "Dev", "pages": [{"title": "Old page", "url": "https://history.test"}],
             "schemaVersion": 1, "embeddingModel": "text-embedding-3-small", "embeddingDimensions": 1536,
             "approvedAt": "2026-10-12T00:00:00Z",
         }}}

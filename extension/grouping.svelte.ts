@@ -1,7 +1,7 @@
 import { requestProposal } from "./llm";
 import { validateProposal } from "./proposal";
 import { applyGroups, getTabState } from "./tabs";
-import { getQdrantSettings, getSettings } from "./settings";
+import { getQdrantSettings, getSavedGroupingsUserId, getSettings } from "./settings";
 import { GroupingVectorStore } from "./vector-store";
 import type { ApprovedGroup } from "./vector-store";
 import type { GroupingExample, PageInfo, PendingProposal } from "./types";
@@ -93,7 +93,8 @@ export class GroupingState {
 
 			this.status = "Finding saved grouping examples…";
 			const openai = await getSettings();
-			const store = new GroupingVectorStore(qdrant, openai.apiKey);
+			const userId = await getSavedGroupingsUserId();
+			const store = new GroupingVectorStore(qdrant, openai.apiKey, userId);
 			const query = JSON.stringify({ pages: snapshot.map(({ title, url }) => ({ title, url })) });
 
 			const matches = await store.search(query, 5, this.controller.signal);
@@ -183,7 +184,8 @@ export class GroupingState {
 				throw new Error("Connect OpenAI to save approved groupings.");
 			}
 
-			const store = new GroupingVectorStore(qdrant, openai.apiKey);
+			const userId = await getSavedGroupingsUserId();
+			const store = new GroupingVectorStore(qdrant, openai.apiKey, userId);
 
 			await store.saveGroups(this.groupsToSave, this.controller.signal);
 
