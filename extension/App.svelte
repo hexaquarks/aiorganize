@@ -86,7 +86,10 @@
 	<QdrantSettings connection={qdrant} visible={connection.editing} />
 	<p id="privacy-note" class="privacy-note">
 		<Icon name="privacy" />
-		<span>Organizing sends tab titles and URLs to OpenAI.<br />Your data is only used to group your tabs.</span>
+		<span>
+			Organizing sends tab titles and URLs to OpenAI.<br />
+			With Qdrant connected, approved groupings are saved for future suggestions.
+		</span>
 	</p>
 	<div id="connection-actions" hidden={!connection.saved.apiKey} inert={connection.testing}>
 		<button
@@ -104,6 +107,18 @@
 	<div class="flex items-center gap-2">
 		<span id="activity" class:spinning={grouping.busy} aria-hidden="true"></span>
 		<p id="status" role="status" aria-live="polite">{grouping.status}</p>
+	</div>
+	<div class="mt-2" hidden={!grouping.savedGroupingsStatus}>
+		<p id="saved-groupings-status" class="note" role="status" aria-live="polite">{grouping.savedGroupingsStatus}</p>
+		{#if grouping.canRetrySave}
+			<button
+				id="retry-save-groupings"
+				class="text-button"
+				type="button"
+				disabled={grouping.busy || !connection.connected}
+				onclick={() => grouping.retrySave()}>Retry save</button
+			>
+		{/if}
 	</div>
 	<GroupPreview
 		pending={grouping.pending}
