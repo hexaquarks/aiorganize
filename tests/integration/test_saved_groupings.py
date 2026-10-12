@@ -17,6 +17,13 @@ class SavedGroupingsTest(PanelTestCase):
         self.database_requests = []
         self.write_status = write_status
         self.embedding_status = embedding_status
+        self.saved_points = {}
+        self.user_id = "661f4c48-e00e-4d83-8126-a3a78fd3dd10"
+        await self.panel.evaluate(
+            "userId => chrome.storage.local.set({savedGroupingsUserId: userId})", self.user_id,
+        )
+        self.query_status = 200
+        self.query_result = None
 
         if connected:
             await self.panel.evaluate("""() => chrome.storage.session.set({qdrant: {
@@ -45,6 +52,7 @@ class SavedGroupingsTest(PanelTestCase):
                 await route.fulfill(json={"status": "ok", "result": {
                     "config": {"params": {"vectors": {"size": 1536, "distance": "Cosine"}}},
                     "payload_schema": {
+                        "userId": {"data_type": "keyword"},
                         "schemaVersion": {"data_type": "integer"},
                         "embeddingModel": {"data_type": "keyword"},
                         "embeddingDimensions": {"data_type": "integer"},
@@ -52,11 +60,29 @@ class SavedGroupingsTest(PanelTestCase):
                 }})
                 return
 
+            if request.url.endswith("/points/query"):
+                if self.query_status != 200:
+                    await route.fulfill(status=self.query_status, json={"error": "provider-secret"})
+                    return
+
+                result = self.query_result
+                if result is None:
+                    query_user = request.post_data_json["filter"]["must"][0]["match"]["value"]
+                    result = {"points": [
+                        {"id": point["id"], "score": 0.9, "payload": point["payload"]}
+                        for point in self.saved_points.values()
+                        if point["payload"].get("userId") == query_user
+                    ]}
+                await route.fulfill(json={"status": "ok", "result": result})
+                return
+
             if self.write_status != 200:
                 await route.fulfill(status=self.write_status, json={"status": {"error": "provider-secret"}})
                 return
 
             await route.fulfill(json={"status": "ok", "result": {"status": "completed"}})
+            for point in request.post_data_json["points"]:
+                self.saved_points[point["id"]] = point
 
         await self.panel.route("https://api.openai.com/v1/embeddings", embed)
         await self.panel.route("https://test.cloud.qdrant.io:6333/**", database)
@@ -64,17 +90,21 @@ class SavedGroupingsTest(PanelTestCase):
     async def approve(self):
         await self.panel.get_by_role("button", name="Approve & apply", exact=True).click()
 
+    def assert_no_saved_grouping_writes(self):
+        self.assertFalse(any(request["method"] == "PUT" for request in self.database_requests))
+        for request in self.embedding_requests:
+            for text in request["input"]:
+                self.assertNotIn("name", json.loads(text))
+
     async def test_only_applied_approvals_save_the_expected_groups(self):
         await self.install_saved_groupings_fixture()
         await self.organize()
         snapshot = (await self.panel.evaluate(TAB_STATE))["tabs"]
 
-        self.assertEqual(self.embedding_requests, [])
-        self.assertEqual(self.database_requests, [])
+        self.assert_no_saved_grouping_writes()
         await self.panel.get_by_role("button", name="Reject", exact=True).click()
 
-        self.assertEqual(self.embedding_requests, [])
-        self.assertEqual(self.database_requests, [])
+        self.assert_no_saved_grouping_writes()
         await self.organize()
         await self.approve()
 
@@ -93,8 +123,9 @@ class SavedGroupingsTest(PanelTestCase):
         for point in points:
             payload = point["payload"]
             self.assertEqual(set(payload), {
-                "name", "pages", "approvedAt", "schemaVersion", "embeddingModel", "embeddingDimensions",
+                "userId", "name", "pages", "approvedAt", "schemaVersion", "embeddingModel", "embeddingDimensions",
             })
+            self.assertEqual(payload["userId"], self.user_id)
             datetime.fromisoformat(payload["approvedAt"])
         uploaded = json.dumps([self.embedding_requests, writes])
         for excluded in (PRIVATE_PAGE_TEXT, "qdrant-test-key", "test-secret", "chrome_id", "tab-"):
@@ -110,8 +141,7 @@ class SavedGroupingsTest(PanelTestCase):
 
         await expect(self.panel.locator("#status")).to_contain_text("duplicate")
         await expect(self.panel.locator("#approve")).to_be_disabled()
-        self.assertEqual(self.embedding_requests, [])
-        self.assertEqual(self.database_requests, [])
+        self.assert_no_saved_grouping_writes()
 
     async def test_saved_groupings_stay_scoped_to_the_approved_window(self):
         await self.install_saved_groupings_fixture()
@@ -133,7 +163,7 @@ class SavedGroupingsTest(PanelTestCase):
         await self.organize()
         await self.approve()
 
-        await expect(self.panel.locator("#saved-groupings-status")).to_contain_text("Qdrant isn’t connected")
+        await expect(self.panel.locator("#saved-groupings-status")).to_be_hidden()
         await expect(self.panel.locator("#status")).to_have_text("Your tabs are organized.")
         self.assertEqual(self.embedding_requests, [])
         self.assertEqual(self.database_requests, [])
@@ -146,8 +176,7 @@ class SavedGroupingsTest(PanelTestCase):
         await self.approve()
 
         await expect(self.panel.locator("#status")).to_contain_text("Tabs changed after preview")
-        self.assertEqual(self.embedding_requests, [])
-        self.assertEqual(self.database_requests, [])
+        self.assert_no_saved_grouping_writes()
 
         await self.organize()
         await self.panel.evaluate("""() => {
@@ -164,8 +193,7 @@ class SavedGroupingsTest(PanelTestCase):
         await self.approve()
 
         await expect(self.panel.locator("#status")).to_contain_text("Application stopped")
-        self.assertEqual(self.embedding_requests, [])
-        self.assertEqual(self.database_requests, [])
+        self.assert_no_saved_grouping_writes()
 
     async def test_failed_save_can_retry_without_reapplying_tabs_or_changing_ids(self):
         await self.install_saved_groupings_fixture(write_status=503)
@@ -204,6 +232,13 @@ class SavedGroupingsTest(PanelTestCase):
         self.addCleanup(release.set)
 
         async def delayed_embedding(route):
+            inputs = route.request.post_data_json["input"]
+            if "name" not in json.loads(inputs[0]):
+                await route.fulfill(json={
+                    "model": "text-embedding-3-small", "data": [{"index": 0, "embedding": [1] + [0] * 1535}],
+                })
+                return
+
             await release.wait()
             await route.fulfill(status=503, json={"error": {"message": "provider-secret"}})
 

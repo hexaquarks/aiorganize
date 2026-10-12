@@ -43,7 +43,7 @@ EXTENSION_FILES = (
 COMPILED_EXTENSION = PROJECT / "dist" / "extension"
 
 
-def build_frontend(project: Path = PROJECT, *, install: bool = False) -> dict[str, bytes]:
+def build_frontend(project: Path = PROJECT, *, install: bool = False, development: bool = False) -> dict[str, bytes]:
     npm = shutil.which("npm")
 
     if npm is None:
@@ -52,9 +52,14 @@ def build_frontend(project: Path = PROJECT, *, install: bool = False) -> dict[st
     if install:
         subprocess.run([npm, "ci"], cwd=project, check=True)
 
-    subprocess.run([npm, "run", "build"], cwd=project, check=True)
+    command = [npm, "run", "build"]
 
-    directory = project / "dist" / "extension"
+    if development:
+        command.extend(["--", "--mode", "development"])
+
+    subprocess.run(command, cwd=project, check=True)
+
+    directory = project / "dist" / ("development" if development else "extension")
     return {name: (directory / name).read_bytes() for name in EXTENSION_FILES}
 
 

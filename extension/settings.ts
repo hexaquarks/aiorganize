@@ -1,6 +1,7 @@
 import type { Connection, QdrantConnection } from "./types";
 
 import { SUPPORTED_MODELS } from "./model-catalog";
+import { validate as isUuid } from "uuid";
 
 export const DEFAULT_MODEL = SUPPORTED_MODELS[0].id;
 
@@ -13,6 +14,30 @@ interface StoredSettings {
 async function restrictStorage() {
 	await chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
 	await chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
+}
+
+export async function getSavedGroupingsUserId(): Promise<string> {
+	await restrictStorage();
+
+	// Multiple panels can open at once. Give this Chrome profile one persistent identity.
+	return navigator.locks.request("saved-groupings-user-id", async () => {
+		const { savedGroupingsUserId } = await chrome.storage.local.get<{ savedGroupingsUserId?: string }>(
+			"savedGroupingsUserId",
+		);
+
+		if (savedGroupingsUserId !== undefined) {
+			if (!isUuid(savedGroupingsUserId)) {
+				throw new Error("Your saved grouping identity is invalid.");
+			}
+
+			return savedGroupingsUserId;
+		}
+
+		const userId = crypto.randomUUID();
+
+		await chrome.storage.local.set({ savedGroupingsUserId: userId });
+		return userId;
+	});
 }
 
 export async function getSettings(): Promise<Connection> {

@@ -20,6 +20,11 @@ export interface Proposal {
 	groups: ProposedGroup[];
 }
 
+export interface GroupingExample {
+	name: string;
+	pages: { title: string; url: string }[];
+}
+
 export interface PendingProposal extends Proposal {
 	snapshot: TabInfo[];
 	window_id: number;

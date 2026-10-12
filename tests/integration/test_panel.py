@@ -39,7 +39,7 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
             ),
         )
         await self.panel.goto(f"chrome-extension://{extension_id}/panel.html")
-        await self.panel.wait_for_function("document.querySelector('#approve').disabled")
+        await expect(self.panel.locator("#approve")).to_be_disabled(timeout=20000)
 
     async def connect(self, *, remember=False, api_key="test-secret"):
         async def respond(route):
