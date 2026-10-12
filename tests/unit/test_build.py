@@ -67,8 +67,10 @@ class PackageExtensionTest(unittest.TestCase):
                 path.write_bytes(data)
             env = {
                 **os.environ,
-                "GIT_AUTHOR_NAME": "Test", "GIT_COMMITTER_NAME": "Test",
-                "GIT_AUTHOR_EMAIL": "test@example.invalid", "GIT_COMMITTER_EMAIL": "test@example.invalid",
+                "GIT_AUTHOR_NAME": "Test",
+                "GIT_COMMITTER_NAME": "Test",
+                "GIT_AUTHOR_EMAIL": "test@example.invalid",
+                "GIT_COMMITTER_EMAIL": "test@example.invalid",
             }
 
             def run_git(*args):

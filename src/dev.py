@@ -30,6 +30,7 @@ def _macos_chrome() -> tuple[list[Path], Path, str]:
 
 def _windows_chrome() -> tuple[list[Path], Path, str]:
     candidates = []
+
     for name in ("PROGRAMFILES", "PROGRAMFILES(X86)", "LOCALAPPDATA"):
         root = os.environ.get(name)
         if root:
@@ -43,6 +44,7 @@ def _windows_chrome() -> tuple[list[Path], Path, str]:
 
 def _linux_chrome() -> tuple[list[Path], Path, str]:
     candidates = []
+
     for name in ("google-chrome", "google-chrome-stable"):
         executable = shutil.which(name)
         if executable:
@@ -58,8 +60,10 @@ def _linux_chrome() -> tuple[list[Path], Path, str]:
 def _chrome_setup() -> tuple[list[Path], Path, str]:
     if sys.platform == "darwin":
         return _macos_chrome()
+
     if sys.platform == "win32":
         return _windows_chrome()
+
     if sys.platform.startswith("linux"):
         return _linux_chrome()
 
@@ -68,6 +72,7 @@ def _chrome_setup() -> tuple[list[Path], Path, str]:
 
 def _open_source_folder(command: str) -> None:
     opener = shutil.which(command)
+
     if opener:
         subprocess.Popen([opener, str(EXTENSION_PATH)])
     else:
@@ -78,6 +83,7 @@ def open_regular_chrome() -> None:
     """Open the extension manager and source folder using the local Chrome installation."""
     candidates, profile, folder_opener = _chrome_setup()
     chrome = next((path for path in candidates if path.is_file()), None)
+
     if chrome is None:
         raise RuntimeError("Chrome not found.")
 
@@ -97,6 +103,7 @@ async def load_extension(context: BrowserContext, extension_path: Path = EXTENSI
         raise RuntimeError("A Playwright-managed browser is required.")
 
     session = await context.browser.new_browser_cdp_session()
+
     try:
         # Current Chrome uses this debugging API instead of --load-extension.
         result = await session.send("Extensions.loadUnpacked", {"path": str(extension_path.resolve())})
@@ -114,6 +121,7 @@ async def run_dev(profile: Path, *, check: bool = False) -> None:
             args=CHROME_ARGS,
             ignore_default_args=["--disable-extensions"],
         )
+
         try:
             extension_id = await load_extension(context)
             panel = await context.new_page()
@@ -137,6 +145,7 @@ def main() -> None:
 
     try:
         build_frontend()
+
         if args.isolated or args.check or args.profile:
             profile = (args.profile or DEFAULT_PROFILE).resolve()
             asyncio.run(run_dev(profile, check=args.check))

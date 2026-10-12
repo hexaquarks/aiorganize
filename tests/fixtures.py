@@ -2,7 +2,6 @@ from html import escape
 
 from playwright.async_api import BrowserContext, Route
 
-
 from src.build import COMPILED_EXTENSION as EXTENSION_PATH
 
 TEST_TABS = {
@@ -27,8 +26,10 @@ async def create_test_tabs(context: BrowserContext) -> None:
         )
 
     await context.route("https://tabs.test/**", serve)
+
     # Chrome starts with a blank tab; use it for the first test page.
     first_page = context.pages[0] if context.pages else await context.new_page()
+
     for index, url in enumerate(TEST_TABS):
         page = first_page if index == 0 else await context.new_page()
         await page.goto(url)
