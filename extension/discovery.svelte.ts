@@ -7,6 +7,7 @@ export class ModelDiscovery {
 	models = $state<ModelOption[]>([...SUPPORTED_MODELS]);
 	status = $state("Supported models · enter your key to check account availability.");
 	loading = $state(false);
+
 	private controller: AbortController | null = null;
 	private timer: ReturnType<typeof setTimeout> | undefined;
 	private loadedKey = "";
@@ -15,19 +16,24 @@ export class ModelDiscovery {
 	cancel() {
 		clearTimeout(this.timer);
 		this.controller?.abort();
+
 		this.controller = null;
 		this.loading = false;
 	}
 
 	reset() {
 		this.cancel();
+
 		this.models = [...SUPPORTED_MODELS];
 		this.loadedKey = "";
 		this.status = "Supported models · enter your key to check account availability.";
 	}
 
 	preserve(model: string) {
-		if (this.models.some((item) => item.id === model)) return;
+		if (this.models.some((item) => item.id === model)) {
+			return;
+		}
+
 		this.models = [
 			...this.models.slice(0, 14),
 			{
@@ -41,28 +47,42 @@ export class ModelDiscovery {
 	schedule(apiKey: string, model: string) {
 		this.reset();
 		this.preserve(model);
-		if (apiKey.trim()) this.timer = setTimeout(() => void this.refresh(apiKey, model), 600);
+
+		if (apiKey.trim()) {
+			this.timer = setTimeout(() => void this.refresh(apiKey, model), 600);
+		}
 	}
 
 	async refresh(apiKey: string, model: string, force = false) {
 		clearTimeout(this.timer);
+
 		apiKey = apiKey.trim();
+
 		const cached = this.loadedKey === apiKey && Date.now() - this.loadedAt < 300000;
-		if (!apiKey || this.loading || (!force && cached)) return;
+
+		if (!apiKey || this.loading || (!force && cached)) {
+			return;
+		}
 
 		const controller = new AbortController();
 		this.controller = controller;
 		this.loading = true;
 		this.status = "Loading available models…";
+
 		try {
 			const items = await fetchModels(apiKey, controller.signal);
-			if (controller.signal.aborted) return;
+
+			if (controller.signal.aborted) {
+				return;
+			}
+
 			this.models = items.map((item) => ({
 				...item,
 				name: SUPPORTED_MODELS.find((fallback) => fallback.id === item.id)?.name || item.name,
 			}));
 			this.models.sort((a, b) => Number(b.id === DEFAULT_MODEL) - Number(a.id === DEFAULT_MODEL));
 			this.preserve(model);
+
 			this.loadedKey = apiKey;
 			this.loadedAt = Date.now();
 			this.status = items.length

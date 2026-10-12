@@ -20,6 +20,7 @@
 	let picker: HTMLDivElement;
 	let trigger: HTMLButtonElement;
 	let list: HTMLDivElement;
+
 	const label = $derived(models.find((model) => model.id === value)?.name || value);
 
 	function options() {
@@ -27,55 +28,93 @@
 	}
 
 	async function open(index = models.findIndex((model) => model.id === value)) {
-		if (disabled) return;
+		if (disabled) {
+			return;
+		}
+
 		expanded = true;
 		await tick();
+
 		const option = options()[Math.max(0, index)];
 		option?.focus();
 		option?.scrollIntoView({ block: "nearest" });
+
 		onopen();
 	}
 
 	function select(model: ModelOption) {
 		value = model.id;
 		expanded = false;
+
 		trigger.focus();
 		onchange();
 	}
 
 	function triggerKey(event: KeyboardEvent) {
-		if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+		if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+			return;
+		}
+
 		event.preventDefault();
-		void open(event.key === "Home" ? 0 : event.key === "End" ? models.length - 1 : undefined);
+
+		let index: number | undefined;
+
+		if (event.key === "Home") {
+			index = 0;
+		} else if (event.key === "End") {
+			index = models.length - 1;
+		}
+
+		void open(index);
 	}
 
 	function optionKey(event: KeyboardEvent) {
 		const items = options();
 		const index = items.indexOf(document.activeElement as HTMLButtonElement);
 		let next: number | undefined;
-		if (event.key === "ArrowDown") next = (index + 1) % items.length;
-		if (event.key === "ArrowUp") next = (index + items.length - 1) % items.length;
-		if (event.key === "Home") next = 0;
-		if (event.key === "End") next = items.length - 1;
+
+		if (event.key === "ArrowDown") {
+			next = (index + 1) % items.length;
+		}
+
+		if (event.key === "ArrowUp") {
+			next = (index + items.length - 1) % items.length;
+		}
+
+		if (event.key === "Home") {
+			next = 0;
+		}
+
+		if (event.key === "End") {
+			next = items.length - 1;
+		}
+
 		if (next !== undefined) {
 			event.preventDefault();
 			items[next]?.focus();
 			items[next]?.scrollIntoView({ block: "nearest" });
 		} else if (event.key === "Escape" || event.key === "Tab") {
-			if (event.key === "Escape") event.preventDefault();
+			if (event.key === "Escape") {
+				event.preventDefault();
+			}
+
 			expanded = false;
 			trigger.focus();
 		}
 	}
 
 	$effect(() => {
-		if (disabled) expanded = false;
+		if (disabled) {
+			expanded = false;
+		}
 	});
 </script>
 
 <svelte:document
 	onclick={(event) => {
-		if (picker && !picker.contains(event.target as Node)) expanded = false;
+		if (picker && !picker.contains(event.target as Node)) {
+			expanded = false;
+		}
 	}}
 />
 
@@ -84,7 +123,9 @@
 	class="relative mt-2"
 	bind:this={picker}
 	onfocusout={(event) => {
-		if (event.relatedTarget && !picker.contains(event.relatedTarget as Node)) expanded = false;
+		if (event.relatedTarget && !picker.contains(event.relatedTarget as Node)) {
+			expanded = false;
+		}
 	}}
 >
 	<button
@@ -99,7 +140,13 @@
 		aria-controls="model-options"
 		aria-labelledby="model-label selected-model"
 		onkeydown={triggerKey}
-		onclick={() => (expanded ? (expanded = false) : open())}
+		onclick={() => {
+			if (expanded) {
+				expanded = false;
+			} else {
+				void open();
+			}
+		}}
 	>
 		<span id="selected-model">{label}</span>
 		<span aria-hidden="true">⌄</span>

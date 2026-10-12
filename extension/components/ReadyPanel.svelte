@@ -12,10 +12,25 @@
 		grouping: GroupingState;
 		onedit: () => void;
 	} = $props();
+
 	const label = $derived(
 		SUPPORTED_MODELS.find((item) => item.id === connection.saved.model)?.name || connection.saved.model,
 	);
 	const verified = $derived(new Date(connection.saved.verifiedAt || Date.now()));
+
+	const organizeLabel = $derived.by(() => {
+		if (grouping.busy) {
+			return "Working…";
+		}
+
+		if (grouping.tabCount) {
+			const tabLabel = grouping.tabCount === 1 ? "tab" : "tabs";
+
+			return `Organize ${grouping.tabCount} ${tabLabel}`;
+		}
+
+		return "Organize tabs";
+	});
 </script>
 
 <section id="ready" hidden={!connection.connected}>
@@ -47,13 +62,7 @@
 			disabled={grouping.busy || !connection.connected}
 			onclick={() => grouping.organize()}
 		>
-			<span aria-hidden="true">✦</span><span id="organize-label">
-				{grouping.busy
-					? "Working…"
-					: grouping.tabCount
-						? `Organize ${grouping.tabCount} ${grouping.tabCount === 1 ? "tab" : "tabs"}`
-						: "Organize tabs"}
-			</span>
+			<span aria-hidden="true">✦</span><span id="organize-label">{organizeLabel}</span>
 		</button>
 		<p class="footnote">Tab titles and URLs are sent to OpenAI.</p>
 	</div>

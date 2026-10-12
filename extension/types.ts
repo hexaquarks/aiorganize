@@ -38,3 +38,10 @@ export interface ModelOption {
 	note: string;
 	created?: number;
 }
+
+export interface QdrantConnection {
+	url: string;
+	apiKey: string;
+	remember: boolean;
+	verifiedAt: string | null;
+}

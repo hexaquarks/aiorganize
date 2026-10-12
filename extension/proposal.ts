@@ -5,19 +5,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function readGroup(value: unknown): ProposedGroup {
-	if (
-		!isRecord(value) ||
-		Object.keys(value).some((key) => !["name", "tab_ids"].includes(key)) ||
-		typeof value.name !== "string" ||
-		!value.name.trim() ||
-		value.name.length > 7 ||
-		!Array.isArray(value.tab_ids) ||
-		!value.tab_ids.length ||
-		!value.tab_ids.every((id): id is string => typeof id === "string")
-	) {
-		throw new Error("The proposed groups are invalid. Organize again to get a new preview.");
+	const invalidGroupMessage = "The proposed groups are invalid. Organize again to get a new preview.";
+
+	if (!isRecord(value)) {
+		throw new Error(invalidGroupMessage);
 	}
-	return { name: value.name, tab_ids: value.tab_ids };
+
+	const hasUnexpectedFields = Object.keys(value).some((key) => !["name", "tab_ids"].includes(key));
+
+	if (hasUnexpectedFields || typeof value.name !== "string" || !Array.isArray(value.tab_ids)) {
+		throw new Error(invalidGroupMessage);
+	}
+
+	const name = value.name;
+	const tabIds = value.tab_ids;
+	const validName = Boolean(name.trim()) && name.length <= 7;
+
+	if (!validName || !tabIds.length || !tabIds.every((id): id is string => typeof id === "string")) {
+		throw new Error(invalidGroupMessage);
+	}
+
+	return { name, tab_ids: tabIds };
 }
 
 // Treat model output as untrusted, including after TypeScript compilation.
@@ -38,15 +46,18 @@ export function validateProposal(proposal: unknown, snapshot: PageInfo[]): Propo
 
 	for (const group of groups) {
 		const name = group.name.trim().toLowerCase();
+
 		if (names.has(name)) {
 			throw new Error("The proposed groups are invalid. Organize again to get a new preview.");
 		}
+
 		names.add(name);
 
 		for (const id of group.tab_ids) {
 			if (!expectedIds.has(id) || assignedIds.has(id)) {
 				throw new Error("The proposal has missing, duplicate, or unknown tabs. Organize again.");
 			}
+
 			assignedIds.add(id);
 		}
 	}
@@ -54,7 +65,11 @@ export function validateProposal(proposal: unknown, snapshot: PageInfo[]): Propo
 	if (assignedIds.size !== expectedIds.size) {
 		throw new Error("The proposal has missing tabs. Organize again.");
 	}
-	return groups.toSorted(
-		(a, b) => Number(a.name.trim().toLowerCase() === "other") - Number(b.name.trim().toLowerCase() === "other"),
-	);
+
+	return groups.toSorted((first, second) => {
+		const firstIsOther = first.name.trim().toLowerCase() === "other";
+		const secondIsOther = second.name.trim().toLowerCase() === "other";
+
+		return Number(firstIsOther) - Number(secondIsOther);
+	});
 }

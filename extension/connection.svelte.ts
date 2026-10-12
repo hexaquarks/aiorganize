@@ -14,6 +14,7 @@ export class ConnectionState {
 	testing = $state(false);
 	feedback = $state<ConnectionError | null>(null);
 	discovery = new ModelDiscovery();
+
 	private controller = new AbortController();
 
 	get connected() {
@@ -23,19 +24,30 @@ export class ConnectionState {
 	async load() {
 		try {
 			this.saved = await getSettings();
-			if (this.controller.signal.aborted) return;
-			if (this.saved.apiKey && this.saved.verifiedAt) this.showSaved();
-			else this.edit();
+
+			if (this.controller.signal.aborted) {
+				return;
+			}
+
+			if (this.saved.apiKey && this.saved.verifiedAt) {
+				this.showSaved();
+			} else {
+				this.edit();
+			}
 		} catch {
 			this.feedback = new ConnectionError("invalid", "Could not load settings. Reload the extension.", "Retry");
 		}
 	}
 
 	edit() {
-		if (this.testing) return;
+		if (this.testing) {
+			return;
+		}
+
 		this.draft = { ...this.saved };
 		this.editing = true;
 		this.feedback = null;
+
 		this.discovery.preserve(this.draft.model);
 		void this.discovery.refresh(this.draft.apiKey, this.draft.model);
 	}
@@ -47,17 +59,29 @@ export class ConnectionState {
 	}
 
 	async forget() {
-		if (this.testing) return;
+		if (this.testing) {
+			return;
+		}
+
 		await clearKey();
+
 		this.saved = emptyConnection();
 		this.discovery.reset();
 		this.edit();
 	}
 
 	async verify() {
-		if (this.testing || !this.draft.apiKey.trim()) return;
+		if (this.testing || !this.draft.apiKey.trim()) {
+			return;
+		}
+
 		const draft = { ...this.draft, apiKey: this.draft.apiKey.trim() };
-		if (/[\r\n]/.test(draft.apiKey) || !/^[a-zA-Z0-9._:-]{1,100}$/.test(draft.model)) {
+
+		const keyHasLineBreaks = /[\r\n]/.test(draft.apiKey);
+		// Model IDs are short identifiers, not URLs or arbitrary input.
+		const validModelId = /^[a-zA-Z0-9._:-]{1,100}$/.test(draft.model);
+
+		if (keyHasLineBreaks || !validModelId) {
 			this.feedback = new ConnectionError("invalid", "Enter a valid key and model ID.", "Retry");
 			return;
 		}
@@ -65,14 +89,20 @@ export class ConnectionState {
 		this.discovery.cancel();
 		this.testing = true;
 		this.feedback = null;
+
 		try {
 			await testConnection(draft, this.controller.signal);
+
 			draft.verifiedAt = new Date().toISOString();
 			await saveSettings(draft);
+
 			this.saved = draft;
 			this.showSaved();
 		} catch (error) {
-			if (this.controller.signal.aborted) return;
+			if (this.controller.signal.aborted) {
+				return;
+			}
+
 			this.feedback =
 				error instanceof ConnectionError
 					? error

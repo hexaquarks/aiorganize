@@ -5,12 +5,23 @@ import { SUPPORTED_MODELS } from "./model-catalog";
 export class ModelListError extends Error {}
 
 export async function fetchModels(apiKey: string, signal?: AbortSignal): Promise<ModelOption[]> {
+	const signals: AbortSignal[] = [];
+
+	if (signal) {
+		signals.push(signal);
+	}
+
+	signals.push(AbortSignal.timeout(20000));
+
+	const requestSignal = AbortSignal.any(signals);
+
 	const response = await fetch("https://api.openai.com/v1/models", {
 		headers: { Authorization: `Bearer ${apiKey}` },
-		signal: AbortSignal.any([...(signal ? [signal] : []), AbortSignal.timeout(20000)]),
+		signal: requestSignal,
 		redirect: "error",
 		credentials: "omit",
 	});
+
 	// Never expose provider error bodies, which can contain sensitive data.
 	if (!response.ok) {
 		const messages: Record<number, string> = {
@@ -18,17 +29,30 @@ export async function fetchModels(apiKey: string, signal?: AbortSignal): Promise
 			403: "OpenAI denied model-list access (403). Check the key’s Models read permission and project access.",
 			429: "OpenAI rate-limited model lookup (429). Try refreshing shortly.",
 		};
+
 		throw new ModelListError(
 			messages[response.status] || `OpenAI could not list models (HTTP ${response.status}). Try refreshing.`,
 		);
 	}
+
 	const result = await response.json();
-	if (!Array.isArray(result?.data)) throw new Error("Invalid model list.");
+
+	if (!Array.isArray(result?.data)) {
+		throw new Error("Invalid model list.");
+	}
+
 	const unique = new Map<string, ModelOption & { created: number }>();
+
 	for (const item of result.data) {
 		// Account discovery narrows the shortlist rather than restoring snapshots and older models.
-		if (!SUPPORTED_MODELS.some((model) => model.id === item?.id)) continue;
-		if (item.shutdown_date && Date.parse(item.shutdown_date) <= Date.now()) continue;
+		if (!SUPPORTED_MODELS.some((model) => model.id === item?.id)) {
+			continue;
+		}
+
+		if (item.shutdown_date && Date.parse(item.shutdown_date) <= Date.now()) {
+			continue;
+		}
+
 		unique.set(item.id, {
 			id: item.id,
 			name: item.id,
@@ -36,5 +60,6 @@ export async function fetchModels(apiKey: string, signal?: AbortSignal): Promise
 			note: "Available to this key. Test the connection to verify compatibility.",
 		});
 	}
+
 	return [...unique.values()].sort((a, b) => b.created - a.created || a.id.localeCompare(b.id));
 }

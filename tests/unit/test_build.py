@@ -31,7 +31,7 @@ class PackageExtensionTest(unittest.TestCase):
             self.assertNotIn("debugger", manifest["permissions"])
             self.assertNotIn("nativeMessaging", manifest["permissions"])
             self.assertNotIn("scripting", manifest["permissions"])
-            self.assertEqual(manifest["host_permissions"], ["https://api.openai.com/*"])
+            self.assertEqual(manifest["host_permissions"], ["https://api.openai.com/*", "https://*.cloud.qdrant.io/*"])
             self.assertNotIn("page-reader.js", archive.namelist())
             # Development and release execute the same compiled files.
             for name in EXTENSION_FILES:
@@ -67,8 +67,10 @@ class PackageExtensionTest(unittest.TestCase):
                 path.write_bytes(data)
             env = {
                 **os.environ,
-                "GIT_AUTHOR_NAME": "Test", "GIT_COMMITTER_NAME": "Test",
-                "GIT_AUTHOR_EMAIL": "test@example.invalid", "GIT_COMMITTER_EMAIL": "test@example.invalid",
+                "GIT_AUTHOR_NAME": "Test",
+                "GIT_COMMITTER_NAME": "Test",
+                "GIT_AUTHOR_EMAIL": "test@example.invalid",
+                "GIT_COMMITTER_EMAIL": "test@example.invalid",
             }
 
             def run_git(*args):

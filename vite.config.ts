@@ -17,13 +17,18 @@ export default defineConfig({
 				for (const fileName of ["manifest.json", "panel.html", "icons/brand.png"]) {
 					this.emitFile({ type: "asset", fileName, source: readFileSync(resolve("extension", fileName)) });
 				}
+
 				this.emitFile({ type: "asset", fileName: "LICENSE", source: readFileSync("LICENSE") });
 			},
 			writeBundle(_, bundle) {
 				// Keep an existing unpacked installation usable after each rebuild.
 				for (const [fileName, asset] of Object.entries(bundle)) {
-					if (!fileName.startsWith("runtime/")) continue;
+					if (!fileName.startsWith("runtime/")) {
+						continue;
+					}
+
 					const destination = resolve("extension", fileName);
+
 					mkdirSync(dirname(destination), { recursive: true });
 					writeFileSync(destination, asset.type === "chunk" ? asset.code : asset.source);
 				}

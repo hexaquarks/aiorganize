@@ -12,7 +12,8 @@ from src.webstore import WebStoreClient, release, store_versions
 
 PRIVATE_STATUS = {
     "publishedItemRevisionStatus": {
-        "state": "PUBLISHED_TO_TESTERS", "distributionChannels": [{"crxVersion": "0.0.9"}],
+        "state": "PUBLISHED_TO_TESTERS",
+        "distributionChannels": [{"crxVersion": "0.0.9"}],
     },
 }
 
@@ -47,7 +48,8 @@ class WebStoreTest(unittest.TestCase):
             self.client.reset_mock()
             self.client.status.return_value = {
                 "publishedItemRevisionStatus": {
-                    "state": state, "distributionChannels": [{"crxVersion": "0.0.9"}],
+                    "state": state,
+                    "distributionChannels": [{"crxVersion": "0.0.9"}],
                 },
             }
             with self.subTest(state=state), self.assertRaises(ValueError):
@@ -59,9 +61,12 @@ class WebStoreTest(unittest.TestCase):
 
     def test_old_versions_and_active_submissions_are_blocked_before_upload(self):
         for status in (
-            {"publishedItemRevisionStatus": {
-                "state": "PUBLISHED_TO_TESTERS", "distributionChannels": [{"crxVersion": "0.1"}],
-            }},
+            {
+                "publishedItemRevisionStatus": {
+                    "state": "PUBLISHED_TO_TESTERS",
+                    "distributionChannels": [{"crxVersion": "0.1"}],
+                }
+            },
             {**PRIVATE_STATUS, "submittedItemRevisionStatus": {"state": "PENDING_REVIEW"}},
             {**PRIVATE_STATUS, "submittedItemRevisionStatus": {"state": "STAGED"}},
             {**PRIVATE_STATUS, "lastAsyncUploadState": "IN_PROGRESS"},
@@ -86,15 +91,23 @@ class WebStoreTest(unittest.TestCase):
 
     def test_oauth_and_v2_requests_use_correct_endpoints_without_printing_secrets(self):
         environment = {
-            "CWS_PUBLISHER_ID": "publisher-123", "CWS_EXTENSION_ID": "a" * 32,
-            "CWS_CLIENT_ID": "test-client", "CWS_CLIENT_SECRET": "test-secret",
+            "CWS_PUBLISHER_ID": "publisher-123",
+            "CWS_EXTENSION_ID": "a" * 32,
+            "CWS_CLIENT_ID": "test-client",
+            "CWS_CLIENT_SECRET": "test-secret",
             "CWS_REFRESH_TOKEN": "test-refresh",
         }
         with patch.dict(webstore.os.environ, environment, clear=True):
-            with patch.object(webstore, "_request_json", side_effect=[
-                {"access_token": "test-token"}, PRIVATE_STATUS,
-                {"uploadState": "SUCCEEDED"}, {"state": "PENDING_REVIEW"},
-            ]) as request:
+            with patch.object(
+                webstore,
+                "_request_json",
+                side_effect=[
+                    {"access_token": "test-token"},
+                    PRIVATE_STATUS,
+                    {"uploadState": "SUCCEEDED"},
+                    {"state": "PENDING_REVIEW"},
+                ],
+            ) as request:
                 with patch("sys.stdout", new=io.StringIO()) as output:
                     client = WebStoreClient()
                     client.status()
@@ -108,9 +121,14 @@ class WebStoreTest(unittest.TestCase):
                 self.assertIn("/upload/v2/", upload.full_url)
                 self.assertEqual(upload.data, b"ZIP")
                 self.assertEqual(upload.get_header("Authorization"), "Bearer test-token")
-                self.assertEqual(json.loads(publish.data), {
-                    "publishType": "DEFAULT_PUBLISH", "skipReview": False, "blockOnWarnings": True,
-                })
+                self.assertEqual(
+                    json.loads(publish.data),
+                    {
+                        "publishType": "DEFAULT_PUBLISH",
+                        "skipReview": False,
+                        "blockOnWarnings": True,
+                    },
+                )
                 self.assertEqual(output.getvalue(), "")
 
     def test_async_upload_is_polled_and_failure_or_timeout_is_not_success(self):
