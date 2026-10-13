@@ -42,7 +42,9 @@ class ConnectionSetupTest(PanelTestCase):
         await self.panel.goto(url)
 
         await expect(self.panel.locator("#ready")).to_be_visible()
-        await expect(self.panel.locator("#connection-detail")).to_contain_text("Session only")
+        await self.panel.locator("#settings-toggle").click()
+        await expect(self.panel.locator("#key-storage")).to_contain_text("Session only")
+        await self.panel.locator("#cancel-settings").click()
 
         await self.reopen_browser()
 
@@ -60,7 +62,9 @@ class ConnectionSetupTest(PanelTestCase):
         await self.reopen_browser()
 
         await expect(self.panel.locator("#ready")).to_be_visible()
-        await expect(self.panel.locator("#connection-detail")).to_contain_text("Remembered on this device")
+        await self.panel.locator("#settings-toggle").click()
+        await expect(self.panel.locator("#key-storage")).to_contain_text("Remembered on this device")
+        await self.panel.locator("#cancel-settings").click()
         await expect(self.panel.locator("#organize")).to_be_enabled()
         stores = await self.panel.evaluate("""async () => ({
             local: await chrome.storage.local.get(), session: await chrome.storage.session.get(),
@@ -180,6 +184,7 @@ class ConnectionSetupTest(PanelTestCase):
         await expect(self.panel.locator("#ready")).to_be_visible()
         await expect(self.panel.locator("#api-settings")).to_be_hidden()
 
+        await self.panel.locator("#settings-toggle").click()
         await self.panel.locator("#forget-key").click()
 
         await expect(self.panel.locator("#api-settings")).to_be_visible()
@@ -199,9 +204,9 @@ class ConnectionSetupTest(PanelTestCase):
         self.assertEqual(stores["local"]["connection"]["apiKey"], "test-secret")
         self.assertNotIn("connection", stores["session"])
 
-        await self.panel.locator("#edit-connection").click()
+        await self.panel.locator("#settings-toggle").click()
 
-        await expect(self.panel.locator("#key-label")).to_have_text("Replace key")
+        await expect(self.panel.locator("#key-label")).to_have_text("OpenAI API key")
 
         await self.panel.locator("#api-key").fill("replacement-secret")
 
@@ -285,7 +290,7 @@ class ConnectionSetupTest(PanelTestCase):
 
         before = await self.read_settings()
 
-        await self.panel.locator("#edit-connection").click()
+        await self.panel.locator("#settings-toggle").click()
         await self.panel.locator("#api-model").click()
         await self.panel.get_by_role("option", name="GPT-5.5", exact=True).click()
 

@@ -102,7 +102,7 @@ class SavedGroupingsTest(PanelTestCase):
         snapshot = (await self.panel.evaluate(TAB_STATE))["tabs"]
 
         self.assert_no_saved_grouping_writes()
-        await self.panel.get_by_role("button", name="Reject", exact=True).click()
+        await self.panel.get_by_role("button", name="Discard", exact=True).click()
 
         self.assert_no_saved_grouping_writes()
         await self.organize()

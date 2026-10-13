@@ -85,9 +85,13 @@ export class ModelDiscovery {
 
 			this.loadedKey = apiKey;
 			this.loadedAt = Date.now();
-			this.status = items.length
-				? `${items.length} account models loaded · default first, then newest.`
-				: "No supported models found for this key. Check project access or refresh.";
+			if (items.length) {
+				const modelLabel = items.length === 1 ? "model" : "models";
+
+				this.status = `${items.length} ${modelLabel} available with this key.`;
+			} else {
+				this.status = "No supported models found for this key. Check project access or refresh.";
+			}
 		} catch (error) {
 			if (!controller.signal.aborted) {
 				this.status =

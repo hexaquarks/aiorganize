@@ -45,7 +45,7 @@ class RetrievalTest(PanelTestCase):
 
         await self.organize()
 
-        await expect(self.panel.locator("#retrieval-status")).to_have_text("Using 2 saved grouping examples.")
+        await expect(self.panel.locator("#retrieval-status")).to_have_text("Suggestions informed by your saved groupings.")
         examples = self.proposal_requests[-1]["input"]["saved_groupings"]
         self.assertEqual([example["name"] for example in examples], ["Dev", "Other"])
         self.assertEqual(examples, [
@@ -69,9 +69,11 @@ class RetrievalTest(PanelTestCase):
         await self.capture_proposals()
         await self.organize()
 
-        await expect(self.panel.locator("#retrieval-status")).to_have_text("No saved grouping examples found.")
+        await expect(self.panel.locator("#retrieval-status")).to_be_hidden()
         self.assertNotIn("saved_groupings", self.proposal_requests[-1]["input"])
         self.assertFalse(any(request["method"] == "PUT" for request in self.database_requests))
+
+        await self.panel.locator("#reject").click()
 
         await self.panel.evaluate("() => chrome.storage.session.remove('qdrant')")
         requests_before = len(self.database_requests)
@@ -98,6 +100,7 @@ class RetrievalTest(PanelTestCase):
             self.assertNotIn("saved_groupings", self.proposal_requests[-1]["input"])
             self.assertNotIn("provider-secret", await self.panel.locator("#retrieval-status").inner_text())
             await self.assert_no_groups()
+            await self.panel.locator("#reject").click()
 
     async def test_example_context_is_bounded_and_excludes_database_metadata(self):
         await self.install_saved_groupings_fixture()
@@ -131,7 +134,7 @@ class RetrievalTest(PanelTestCase):
     async def test_history_cannot_allow_invented_ids_or_change_connection_testing(self):
         await self.install_saved_groupings_fixture()
         await self.capture_proposals()
-        await self.panel.locator("#edit-connection").click()
+        await self.panel.locator("#settings-toggle").click()
         await self.panel.locator("#test-connection").click()
 
         await expect(self.panel.locator("#ready")).to_be_visible()
@@ -185,10 +188,11 @@ class RetrievalTest(PanelTestCase):
         await self.panel.route(endpoint, missing)
         await self.organize()
 
-        await expect(self.panel.locator("#retrieval-status")).to_have_text("No saved grouping examples found.")
+        await expect(self.panel.locator("#retrieval-status")).to_be_hidden()
         self.assertEqual(self.embedding_requests, [])
         self.assertNotIn("saved_groupings", self.proposal_requests[-1]["input"])
         await self.panel.unroute(endpoint, missing)
+        await self.panel.locator("#reject").click()
         await self.panel.evaluate("""() => {
             const timeout = AbortSignal.timeout.bind(AbortSignal);
             AbortSignal.timeout = (duration) => {

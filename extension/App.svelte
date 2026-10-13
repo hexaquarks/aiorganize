@@ -12,6 +12,13 @@
 	const connection = new ConnectionState();
 	const grouping = new GroupingState();
 	const qdrant = new QdrantConnectionState();
+	const heading = $derived.by(() => {
+		if (!connection.editing) {
+			return "A little order for your tabs.";
+		}
+
+		return connection.saved.verifiedAt ? "Settings" : "Connect OpenAI";
+	});
 
 	onMount(() => {
 		void connection.load();
@@ -27,14 +34,22 @@
 	});
 
 	function editConnection() {
-		grouping.pending = null;
-		grouping.status = "";
-		grouping.retrievalStatus = "";
-
 		connection.edit();
+		void tick().then(() => document.getElementById("api-key")?.focus());
+	}
+
+	function closeSettings() {
+		connection.showSaved();
+		const target = grouping.pending ? "preview-heading" : "organize";
+
+		void tick().then(() => document.getElementById(target)?.focus());
 	}
 
 	$effect(() => {
+		if (connection.editing) {
+			return;
+		}
+
 		let target: string | null = null;
 
 		if (grouping.pending) {
@@ -56,6 +71,10 @@
 
 			const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+			if (target === "preview") {
+				document.getElementById("preview-heading")?.focus({ preventScroll: true });
+			}
+
 			section.scrollIntoView({
 				block: "start",
 				behavior: reducedMotion ? "instant" : "smooth",
@@ -70,29 +89,36 @@
 		<button
 			id="settings-toggle"
 			class="text-button muted"
+			hidden={connection.editing}
 			type="button"
 			disabled={grouping.busy || connection.testing || qdrant.testing}
 			onclick={editConnection}><Icon name="settings" /> Settings</button
 		>
+		<button
+			id="cancel-settings"
+			class="text-button"
+			type="button"
+			hidden={!connection.editing || !connection.saved.verifiedAt}
+			disabled={connection.testing || qdrant.testing}
+			onclick={closeSettings}>Back</button
+		>
 	</header>
-	<div class="welcome">
-		<span id="badge" class="badge" class:verified={connection.connected}>
-			{connection.connected ? "✓ Connection verified" : "One-time setup"}
-		</span>
-		<h1 id="heading">{connection.connected ? "Less clutter. More focus." : "Connect your AI"}</h1>
-		<p id="intro">{connection.connected ? "Group your tabs by topic." : "Add an OpenAI API key to get started."}</p>
+	<div class="welcome" hidden={!connection.editing && Boolean(grouping.pending)}>
+		<h1 id="heading">{heading}</h1>
+		<p id="intro">
+			{connection.editing
+				? "Choose your model and how to save your settings."
+				: "Find the topics. Keep your focus."}
+		</p>
 	</div>
 	<SettingsForm {connection} />
-	<ReadyPanel {connection} {grouping} onedit={editConnection} />
+	<ReadyPanel {connection} {grouping} savedGroupingsConnected={Boolean(qdrant.saved.verifiedAt)} />
 	<QdrantSettings connection={qdrant} visible={connection.editing} />
-	<p id="privacy-note" class="privacy-note">
+	<p id="privacy-note" class="privacy-note" hidden={!connection.editing}>
 		<Icon name="privacy" />
-		<span>
-			Organizing sends tab titles and URLs to OpenAI.<br />
-			With Qdrant connected, approved groupings are saved for future suggestions.
-		</span>
+		<span> Tab titles and URLs are sent to OpenAI when you organize. Page contents are never read. </span>
 	</p>
-	<div id="connection-actions" hidden={!connection.saved.apiKey} inert={connection.testing}>
+	<div id="connection-actions" hidden={!connection.editing || !connection.saved.apiKey} inert={connection.testing}>
 		<button
 			id="forget-key"
 			class="text-button muted"
@@ -106,14 +132,20 @@
 			}}><Icon name="trash" /> Remove key</button
 		>
 	</div>
-	<div class="flex items-center gap-2">
+	<div class="status-line" hidden={connection.editing}>
 		<span id="activity" class:spinning={grouping.busy} aria-hidden="true"></span>
 		<p id="status" role="status" aria-live="polite">{grouping.status}</p>
 	</div>
-	<p id="retrieval-status" class="note" hidden={!grouping.retrievalStatus} role="status" aria-live="polite">
+	<p
+		id="retrieval-status"
+		class="note"
+		hidden={connection.editing || !grouping.retrievalStatus}
+		role="status"
+		aria-live="polite"
+	>
 		{grouping.retrievalStatus}
 	</p>
-	<div class="mt-2" hidden={!grouping.savedGroupingsStatus}>
+	<div class="mt-2" hidden={connection.editing || !grouping.savedGroupingsStatus}>
 		<p id="saved-groupings-status" class="note" role="status" aria-live="polite">{grouping.savedGroupingsStatus}</p>
 		{#if grouping.canRetrySave}
 			<button
@@ -126,7 +158,7 @@
 		{/if}
 	</div>
 	<GroupPreview
-		pending={grouping.pending}
+		pending={connection.connected ? grouping.pending : null}
 		busy={grouping.busy}
 		onapprove={() => grouping.approve()}
 		onreject={() => grouping.reject()}

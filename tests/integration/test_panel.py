@@ -129,6 +129,56 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
 
 
 class ExtensionPanelTest(PanelTestCase):
+    async def test_home_prioritizes_organizing_and_keeps_configuration_in_settings(self):
+        await self.panel.set_viewport_size({"width": 320, "height": 640})
+        await self.connect()
+        await self.panel.evaluate("""async () => {
+            await chrome.storage.session.set({qdrant: {
+                url: 'https://test.cloud.qdrant.io:6333', apiKey: 'offline-database-key',
+                verifiedAt: '2026-10-12T12:00:00Z',
+            }});
+        }""")
+        await self.panel.reload()
+
+        await expect(self.panel.locator("#organize")).to_be_in_viewport()
+        await expect(self.panel.locator(".tab-total")).to_have_text("6open tabs")
+        await expect(self.panel.locator("#ready")).to_contain_text("Review the suggestions before anything changes.")
+        await expect(self.panel.locator("#ready")).to_contain_text("Approved groupings are also saved")
+        await expect(self.panel.locator("#forget-key")).to_be_hidden()
+        self.assertNotIn("Qdrant", await self.panel.locator("body").inner_text())
+        self.assertNotIn("Last tested", await self.panel.locator("body").inner_text())
+        self.assertTrue(await self.panel.evaluate("() => document.documentElement.scrollWidth <= innerWidth"))
+        await self.panel.screenshot(path="dist/organize-home-320.png", full_page=True)
+
+        await self.panel.locator("#settings-toggle").click()
+
+        await expect(self.panel.locator("#organize")).to_be_hidden()
+        await expect(self.panel.locator("#forget-key")).to_be_visible()
+        await expect(self.panel.locator("#qdrant-settings")).to_be_hidden()
+        await self.panel.locator("#saved-groupings-settings summary").click()
+        await expect(self.panel.locator("#qdrant-settings")).to_be_visible()
+        await self.panel.locator("#cancel-settings").click()
+        await expect(self.panel.locator("#organize")).to_be_visible()
+        await self.assert_no_groups()
+
+    async def test_settings_preserve_preview_and_return_keyboard_focus(self):
+        await self.install_proposal_fixture()
+        await self.organize()
+        original_groups = await self.panel.locator("#groups").inner_text()
+
+        await self.panel.locator("#settings-toggle").click()
+
+        await expect(self.panel.locator("#api-key")).to_be_focused()
+        await expect(self.panel.locator("#preview")).to_be_hidden()
+        await expect(self.panel.locator("#approve")).to_be_disabled()
+        await self.panel.locator("#cancel-settings").click()
+
+        await expect(self.panel.locator("#preview-heading")).to_be_focused()
+        await expect(self.panel.locator("#preview")).to_be_visible()
+        await expect(self.panel.locator("#groups")).to_have_text(original_groups, use_inner_text=True)
+        await expect(self.panel.locator("#approve")).to_be_enabled()
+        await self.assert_no_groups()
+
     async def test_missing_api_key_reports_error_without_mutations(self):
         self.assertTrue(
             await self.panel.evaluate("async () => (await chrome.sidePanel.getPanelBehavior()).openPanelOnActionClick")
@@ -150,6 +200,8 @@ class ExtensionPanelTest(PanelTestCase):
         await self.organize()
 
         await expect(self.panel.locator("#preview-heading")).to_be_in_viewport()
+        await expect(self.panel.locator("#preview-heading")).to_be_focused()
+        await expect(self.panel.locator("#ready")).to_be_hidden()
 
         await self.panel.wait_for_function("() => document.querySelector('#preview').getBoundingClientRect().top <= 20")
 
@@ -185,7 +237,7 @@ class ExtensionPanelTest(PanelTestCase):
         await expect(self.panel.locator("#summary")).to_have_text("6 tabs in 2 groups.")
         await self.assert_no_groups()
 
-        await self.panel.get_by_role("button", name="Reject", exact=True).click()
+        await self.panel.get_by_role("button", name="Discard", exact=True).click()
 
         await expect(self.panel.locator("#preview")).to_be_hidden()
         await self.assert_no_groups()

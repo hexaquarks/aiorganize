@@ -11,6 +11,7 @@ class QdrantConnectionTest(PanelTestCase):
     reopen_browser = test_settings.ConnectionSetupTest.reopen_browser
 
     async def fill_qdrant(self, *, remember=False):
+        await self.panel.locator("#saved-groupings-settings summary").click()
         await self.panel.locator("#qdrant-url").fill("https://test.cloud.qdrant.io:6333/")
         await self.panel.locator("#qdrant-key").fill("qdrant-test-secret")
         await self.panel.locator("#qdrant-remember").set_checked(remember)
@@ -52,13 +53,14 @@ class QdrantConnectionTest(PanelTestCase):
         self.assertEqual(stores["session"]["qdrant"]["url"], "https://test.cloud.qdrant.io:6333")
 
         await self.panel.reload()
+        await self.panel.locator("#saved-groupings-settings summary").click()
 
         await expect(self.panel.locator("#qdrant-saved")).to_contain_text("Session only")
         await expect(self.panel.locator("#qdrant-key")).to_have_attribute("type", "password")
 
         await self.connect()
 
-        await expect(self.panel.locator("#qdrant-summary")).to_contain_text("Qdrant connected")
+        await expect(self.panel.locator("#qdrant-settings")).to_be_hidden()
 
         await self.panel.locator("#settings-toggle").click()
 
@@ -87,6 +89,7 @@ class QdrantConnectionTest(PanelTestCase):
         await expect(self.panel.locator("#qdrant-saved")).to_contain_text("Remembered")
 
         await self.reopen_browser()
+        await self.panel.locator("#saved-groupings-settings summary").click()
 
         await expect(self.panel.locator("#qdrant-saved")).to_contain_text("Remembered")
 
@@ -103,6 +106,7 @@ class QdrantConnectionTest(PanelTestCase):
         self.assertNotIn("qdrant", (await self.stores())["local"])
 
         await self.reopen_browser()
+        await self.panel.locator("#saved-groupings-settings summary").click()
 
         await expect(self.panel.locator("#qdrant-key")).to_be_empty()
         self.assertNotIn("qdrant", (await self.stores())["session"])

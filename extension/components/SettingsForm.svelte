@@ -50,9 +50,10 @@
 		void connection.verify();
 	}}
 >
+	<h2 class="settings-heading">AI model</h2>
 	<fieldset id="settings-fields" disabled={connection.testing}>
 		<div class="flex items-center justify-between">
-			<label id="key-label" for="api-key">{connection.saved.apiKey ? "Replace key" : "OpenAI API key"}</label>
+			<label id="key-label" for="api-key">OpenAI API key</label>
 			<a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">Get a key ↗</a>
 		</div>
 		<div class="key-input">
@@ -100,6 +101,9 @@
 			{discovery.status}
 		</p>
 		<p id="model-note" class="note">{modelNote || "Test to verify model compatibility."}</p>
+		<p id="key-storage" class="note" hidden={!connection.saved.verifiedAt}>
+			Saved key · {connection.saved.remember ? "Remembered on this device" : "Session only"}
+		</p>
 		<label class="remember">
 			<input
 				id="remember-key"
@@ -110,7 +114,7 @@
 			<span
 				>Remember key on this device
 				<small
-					>Unchecked: kept until Chrome fully quits.<br />Closing this panel keeps the key. Never synced.</small
+					>Stored locally without encryption; never synced. When unchecked, the key lasts until Chrome quits.</small
 				>
 			</span>
 		</label>
@@ -123,7 +127,7 @@
 		disabled={connection.testing || !connection.draft.apiKey.trim() || !connection.draft.model}
 	>
 		<span class="spinner" aria-hidden="true"></span>
-		<span id="test-label">{connection.testing ? "Testing connection…" : "Test & save connection"}</span>
+		<span id="test-label">{connection.testing ? "Checking model…" : "Verify & save"}</span>
 	</button>
 	<p class="footnote">Runs a small API test. Charges may apply.</p>
 	<div
@@ -153,12 +157,4 @@
 			{/if}
 		{/if}
 	</div>
-	<button
-		id="cancel-settings"
-		class="text-button"
-		type="button"
-		hidden={!connection.saved.verifiedAt}
-		disabled={connection.testing}
-		onclick={() => connection.showSaved()}>Use saved connection</button
-	>
 </form>

@@ -97,7 +97,7 @@ class BrowserApiTest(PanelTestCase):
         self.assertNotIn(PRIVATE_PAGE_TEXT, json.dumps(request))
         await self.assert_no_groups()
 
-        await self.panel.get_by_role("button", name="Reject", exact=True).click()
+        await self.panel.get_by_role("button", name="Discard", exact=True).click()
 
         await self.assert_no_groups()
 
@@ -138,14 +138,14 @@ class BrowserApiTest(PanelTestCase):
         self.assertEqual(stored["session"]["connection"]["apiKey"], "test-key")
         self.assertEqual(stored["sync"], {})
 
-        await self.panel.locator("#edit-connection").click()
+        await self.panel.locator("#settings-toggle").click()
         await self.save_key(remember=True)
         await self.panel.evaluate("() => chrome.storage.session.clear()")
         await self.panel.reload()
 
         await expect(self.panel.locator("#ready")).to_be_visible()
 
-        await self.panel.locator("#edit-connection").click()
+        await self.panel.locator("#settings-toggle").click()
 
         await expect(self.panel.locator("#remember-key")).to_be_checked()
 

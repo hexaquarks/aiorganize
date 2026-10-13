@@ -101,11 +101,9 @@ export class GroupingState {
 			const examples = matches.map((match) => match.savedGrouping);
 
 			if (examples.length) {
-				const label = examples.length === 1 ? "example" : "examples";
-
-				this.retrievalStatus = `Using ${examples.length} saved grouping ${label}.`;
+				this.retrievalStatus = "Suggestions informed by your saved groupings.";
 			} else {
-				this.retrievalStatus = "No saved grouping examples found.";
+				this.retrievalStatus = "";
 			}
 
 			return examples;
@@ -126,6 +124,7 @@ export class GroupingState {
 
 		this.busy = true;
 		this.status = "Applying approved groups…";
+		this.retrievalStatus = "";
 		const proposal = this.pending;
 
 		try {
@@ -197,9 +196,9 @@ export class GroupingState {
 			}
 
 			// Keep this failure separate from Chrome application, which already completed.
-			const message = error instanceof Error ? error.message : "Could not save approved groupings.";
-
-			this.savedGroupingsStatus = `Groupings weren’t saved. ${message}`;
+			console.warn("Could not save approved groupings. Check the saved groupings connection in Settings.");
+			this.savedGroupingsStatus =
+				"Groupings weren’t saved for next time. Retry or check saved groupings in Settings.";
 			this.canRetrySave = true;
 		}
 	}
