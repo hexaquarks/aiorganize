@@ -21,3 +21,8 @@ dependencies = [
     "qdrant-client>=1.19.1",
     "uvicorn[standard]>=0.54.0",
 ]
+
+[dependency-groups]
+dev = [
+    "packaging>=26.3",
+]

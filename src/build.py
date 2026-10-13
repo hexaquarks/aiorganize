@@ -1,19 +1,25 @@
-"""Build a reproducible store ZIP from a release tag, or a local preview."""
+"""Build a store ZIP from a release tag, or a local preview."""
 
 import argparse
 import hashlib
 import io
 import json
-import re
 import shutil
 import subprocess
 import tarfile
 import tempfile
 from pathlib import Path
-from zipfile import ZIP_STORED, ZipFile, ZipInfo
+from zipfile import ZIP_DEFLATED, ZipFile
+
+from packaging.version import Version
 
 
 PROJECT = Path(__file__).resolve().parents[1]
+# Chrome's manifest specification limits versions to four components, each at most 65535.
+# https://developer.chrome.com/docs/extensions/reference/manifest/version
+MAX_CHROME_VERSION_COMPONENTS = 4
+MAX_CHROME_VERSION_COMPONENT = 65535
+
 # An explicit list prevents local configuration and development utilities entering releases.
 EXTENSION_FILES = (
     "runtime/background.js",
@@ -47,17 +53,24 @@ def build_frontend(project: Path = PROJECT, *, install: bool = False, developmen
     return {name: (directory / name).read_bytes() for name in EXTENSION_FILES}
 
 
-def chrome_version(version: str) -> tuple[int, ...]:
-    """Compare versions as Chrome does: missing components count as zero."""
-    if not re.fullmatch(r"(?:0|[1-9][0-9]{0,4})(?:\.(?:0|[1-9][0-9]{0,4})){0,3}", version):
+def chrome_version(version: str) -> Version:
+    """Use the package for comparison, with Chrome's narrower manifest constraints."""
+    parsed = Version(version)
+    components = parsed.release
+    numeric_version = ".".join(str(component) for component in components)
+
+    # Chrome rejects prerelease suffixes and leading zeros that Python versions allow.
+    if version != numeric_version:
         raise ValueError(f"Invalid Chrome version: {version}")
 
-    parts = tuple(int(part) for part in version.split("."))
-
-    if not any(parts) or any(part > 65535 for part in parts):
+    exceeds_limits = (
+        len(components) > MAX_CHROME_VERSION_COMPONENTS
+        or max(components) > MAX_CHROME_VERSION_COMPONENT
+    )
+    if exceeds_limits or not any(components):
         raise ValueError(f"Invalid Chrome version: {version}")
 
-    return parts + (0,) * (4 - len(parts))
+    return parsed
 
 
 def build_zip(files: dict[str, bytes], tag: str, previous_versions: list[str]) -> bytes:
@@ -73,13 +86,9 @@ def build_zip(files: dict[str, bytes], tag: str, previous_versions: list[str]) -
 
     output = io.BytesIO()
 
-    with ZipFile(output, "w", compression=ZIP_STORED) as archive:
+    with ZipFile(output, "w", compression=ZIP_DEFLATED) as archive:
         for name in sorted(EXTENSION_FILES):
-            data = files[name]
-            entry = ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
-            entry.create_system = 3
-            entry.external_attr = 0o100644 << 16
-            archive.writestr(entry, data)
+            archive.writestr(name, files[name])
 
     return output.getvalue()
 

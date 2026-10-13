@@ -19,13 +19,12 @@ class PackageExtensionTest(unittest.TestCase):
         manifest["version"] = "0.1.0"
         self.files["manifest.json"] = json.dumps(manifest).encode()
 
-    def test_archive_is_reproducible_and_contains_only_runtime_files(self):
+    def test_archive_contains_only_runtime_files(self):
         self.files[".env"] = b"OPENAI_API_KEY=do-not-package"
         self.files["tests/fixture.py"] = b"do-not-package"
-        first = build_zip(self.files, "v0.1.0", [])
-        self.assertEqual(first, build_zip(dict(reversed(list(self.files.items()))), "v0.1.0", []))
-        self.assertNotIn(b"do-not-package", first)
-        with ZipFile(io.BytesIO(first)) as archive:
+        archive_bytes = build_zip(self.files, "v0.1.0", [])
+        self.assertNotIn(b"do-not-package", archive_bytes)
+        with ZipFile(io.BytesIO(archive_bytes)) as archive:
             self.assertEqual(archive.namelist(), sorted(EXTENSION_FILES))
             manifest = json.loads(archive.read("manifest.json"))
             self.assertNotIn("debugger", manifest["permissions"])
@@ -49,7 +48,10 @@ class PackageExtensionTest(unittest.TestCase):
         self.assertEqual(chrome_version("1"), chrome_version("1.0.0.0"))
 
     def test_invalid_chrome_versions(self):
-        for version in ("0", "0.0.0.0", "01.2", "1.01", "1.65536", "1.2.3.4.5", "1.0-beta", "v1", "../1"):
+        for version in (
+            "0", "0.0.0.0", "01.2", "1.01", "1.65536", "1.2.3.4.5",
+            "1.0-beta", "1.0rc1", "1.0+local", "1!1.0", "v1", "../1",
+        ):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 chrome_version(version)
 
@@ -95,7 +97,8 @@ class PackageExtensionTest(unittest.TestCase):
                 with patch("sys.argv", ["build", "--tag", "v0.1.0"]):
                     build.main()
             archive = root / "dist/aiorganize-v0.1.0.zip"
-            self.assertEqual(archive.read_bytes(), build_zip(self.files, "v0.1.0", []))
+            with ZipFile(archive) as package:
+                self.assertEqual({name: package.read(name) for name in package.namelist()}, self.files)
 
             # Exercise the real tag-history check, not just an explicitly supplied baseline.
             manifest = json.loads(self.files["manifest.json"])
@@ -117,7 +120,8 @@ class PackageExtensionTest(unittest.TestCase):
             with patch.object(build, "PROJECT", root):
                 with patch("sys.argv", ["build", "--tag", "v0.1.0"]):
                     build.main()
-            self.assertEqual(archive.read_bytes(), build_zip(self.files, "v0.1.0", []))
+            with ZipFile(archive) as package:
+                self.assertEqual({name: package.read(name) for name in package.namelist()}, self.files)
 
     def test_release_rejects_symlink_assets(self):
         with tempfile.TemporaryDirectory() as directory:
