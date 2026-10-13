@@ -38,12 +38,14 @@
 </script>
 
 <section id="preview" aria-labelledby="preview-heading" hidden={!pending}>
-	<div class="flex items-center justify-between gap-2">
-		<h2 id="preview-heading" tabindex="-1">Review your groups</h2>
-		<span class="preview-badge">Preview</span>
-	</div>
-	<p id="summary">{pending?.snapshot.length} tabs in {pending?.groups.length} groups.</p>
-	<p class="preview-note">Only this window changes. Apply when you’re happy with the groups.</p>
+	<header class="preview-header">
+		<div class="preview-heading-row">
+			<h2 id="preview-heading" tabindex="-1">Review your groups</h2>
+			<span class="preview-badge">Preview</span>
+		</div>
+		<p id="summary">{pending?.snapshot.length} tabs in {pending?.groups.length} groups.</p>
+		<p class="preview-note">Only this window changes when you approve.</p>
+	</header>
 	<div id="groups">
 		{#each pending?.groups || [] as group, index}
 			{@const color = groupColor(group.name, index)}
