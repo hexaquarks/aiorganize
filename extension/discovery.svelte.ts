@@ -3,6 +3,10 @@ import { fetchModels, ModelListError } from "./models";
 import { DEFAULT_MODEL } from "./settings";
 import type { ModelOption } from "./types";
 
+const MAX_MODEL_OPTIONS = 15;
+const LOOKUP_DELAY_MS = 600;
+const CACHE_DURATION_MS = 5 * 60 * 1000;
+
 export class ModelDiscovery {
 	models = $state<ModelOption[]>([...SUPPORTED_MODELS]);
 	status = $state("Supported models · enter your key to check account availability.");
@@ -35,7 +39,7 @@ export class ModelDiscovery {
 		}
 
 		this.models = [
-			...this.models.slice(0, 14),
+			...this.models.slice(0, MAX_MODEL_OPTIONS - 1),
 			{
 				id: model,
 				name: SUPPORTED_MODELS.find((item) => item.id === model)?.name || model,
@@ -49,7 +53,7 @@ export class ModelDiscovery {
 		this.preserve(model);
 
 		if (apiKey.trim()) {
-			this.timer = setTimeout(() => void this.refresh(apiKey, model), 600);
+			this.timer = setTimeout(() => void this.refresh(apiKey, model), LOOKUP_DELAY_MS);
 		}
 	}
 
@@ -58,7 +62,7 @@ export class ModelDiscovery {
 
 		apiKey = apiKey.trim();
 
-		const cached = this.loadedKey === apiKey && Date.now() - this.loadedAt < 300000;
+		const cached = this.loadedKey === apiKey && Date.now() - this.loadedAt < CACHE_DURATION_MS;
 
 		if (!apiKey || this.loading || (!force && cached)) {
 			return;
@@ -80,7 +84,17 @@ export class ModelDiscovery {
 				...item,
 				name: SUPPORTED_MODELS.find((fallback) => fallback.id === item.id)?.name || item.name,
 			}));
-			this.models.sort((a, b) => Number(b.id === DEFAULT_MODEL) - Number(a.id === DEFAULT_MODEL));
+			this.models.sort((first, second) => {
+				if (first.id === second.id) {
+					return 0;
+				}
+
+				if (first.id === DEFAULT_MODEL) {
+					return -1;
+				}
+
+				return second.id === DEFAULT_MODEL ? 1 : 0;
+			});
 			this.preserve(model);
 
 			this.loadedKey = apiKey;

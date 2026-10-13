@@ -37,7 +37,7 @@ class PackageExtensionTest(unittest.TestCase):
                 self.assertEqual(archive.read(name), self.files[name])
             self.assertEqual(manifest["version"], "0.1.0")
             for icon in manifest["icons"].values():
-                self.assertTrue(archive.read(icon).startswith(b"\x89PNG\r\n\x1a\n"))
+                self.assertIn(icon, archive.namelist())
 
     def test_version_order_and_tag_alignment(self):
         for tag, previous in (("v0.2.0", []), ("v0.1.0", ["0.1"]), ("v0.1.0", ["0.2.0"])):

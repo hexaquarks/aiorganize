@@ -4,7 +4,7 @@ import type { Connection, GroupingExample, PageInfo, Proposal } from "./types";
 
 import { validateProposal } from "./proposal";
 import { getSettings } from "./settings";
-import { isRecord } from "./vector-requests";
+import { isRecord } from "./types";
 
 const INSTRUCTIONS = [
 	"Propose topic groups for the current tabs using their supplied titles and URLs.",

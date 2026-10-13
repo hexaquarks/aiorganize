@@ -61,5 +61,13 @@ export async function fetchModels(apiKey: string, signal?: AbortSignal): Promise
 		});
 	}
 
-	return [...unique.values()].sort((a, b) => b.created - a.created || a.id.localeCompare(b.id));
+	return [...unique.values()].sort((first, second) => {
+		const newestFirst = second.created - first.created;
+
+		if (newestFirst !== 0) {
+			return newestFirst;
+		}
+
+		return first.id.localeCompare(second.id);
+	});
 }

@@ -69,7 +69,9 @@ test("empty inputs and invalid keys make no requests", async () => {
 
 	await assert.rejects(embedTexts([], "key"), /input/i);
 	await assert.rejects(embedTexts([" "], "key"), /input/i);
-	await assert.rejects(embedTexts(["Python"], "bad\nkey"), /key/i);
+	for (const key of ["", "bad\nkey", "bad key", "badékey"]) {
+		await assert.rejects(embedTexts(["Python"], key), /key/i);
+	}
 });
 
 test("HTTP failures, invalid JSON, and wrong models use safe error messages", async () => {

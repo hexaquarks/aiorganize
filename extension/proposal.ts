@@ -1,8 +1,5 @@
 import type { PageInfo, ProposedGroup } from "./types";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
+import { isRecord } from "./types";
 
 function readGroup(value: unknown): ProposedGroup {
 	const invalidGroupMessage = "The proposed groups are invalid. Organize again to get a new preview.";
@@ -70,6 +67,10 @@ export function validateProposal(proposal: unknown, snapshot: PageInfo[]): Propo
 		const firstIsOther = first.name.trim().toLowerCase() === "other";
 		const secondIsOther = second.name.trim().toLowerCase() === "other";
 
-		return Number(firstIsOther) - Number(secondIsOther);
+		if (firstIsOther === secondIsOther) {
+			return 0;
+		}
+
+		return firstIsOther ? 1 : -1;
 	});
 }

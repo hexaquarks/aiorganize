@@ -1,5 +1,5 @@
 import { embedTexts } from "./embeddings";
-import { isRecord } from "./vector-requests";
+import { isRecord } from "./types";
 import type { GroupingExample } from "./types";
 
 const API_URL = import.meta.env.APP_API_URL;
