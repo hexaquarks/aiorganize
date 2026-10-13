@@ -8,9 +8,9 @@ future suggestions.
 
 <p align="center">
   <img
-    src="assets/demo.gif"
+    src="assets/screenshot.png"
     width="800"
-    alt="AI Organize reviewing six sample tabs, then applying Dev and Travel groups in Chrome"
+    alt="AI Organize showing a four-tab group preview beside Dev and Travel tab groups in dark Chrome"
   />
 </p>
 
