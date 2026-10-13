@@ -40,7 +40,6 @@ Resources:
           QDRANT_API_KEY: !Ref QdrantApiKey
           QDRANT_COLLECTION: !Ref QdrantCollection
           APP_SIGNING_SECRET: !Ref AppSigningSecret
-          ACCESS_TABLE: !Ref AccessTable
       Events:
         Register:
           Type: HttpApi
@@ -74,25 +73,6 @@ Resources:
         ThrottlingBurstLimit: 10
         ThrottlingRateLimit: 2
 
-  AccessTable:
-    Type: AWS::DynamoDB::Table
-    DeletionPolicy: Retain
-    UpdateReplacePolicy: Retain
-    Properties:
-      BillingMode: PAY_PER_REQUEST
-      AttributeDefinitions:
-        - AttributeName: id
-          AttributeType: S
-      KeySchema:
-        - AttributeName: id
-          KeyType: HASH
-      TimeToLiveSpecification:
-        AttributeName: expiresAt
-        Enabled: true
-      OnDemandThroughput:
-        MaxReadRequestUnits: 20
-        MaxWriteRequestUnits: 20
-
   ApiRole:
     Type: AWS::IAM::Role
     Properties:
@@ -111,9 +91,6 @@ Resources:
               - Effect: Allow
                 Action: [logs:CreateLogStream, logs:PutLogEvents]
                 Resource: !GetAtt ApiLogs.Arn
-              - Effect: Allow
-                Action: [dynamodb:GetItem, dynamodb:UpdateItem]
-                Resource: !GetAtt AccessTable.Arn
 
   ApiLogs:
     Type: AWS::Logs::LogGroup
@@ -124,5 +101,3 @@ Resources:
 Outputs:
   ApiUrl:
     Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
-  AccessTableName:
-    Value: !Ref AccessTable

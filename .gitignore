@@ -1,5 +1,6 @@
 AGENTS.md
 .aws-sam/
+samconfig.toml
 .venv/
 __pycache__/
 *.pyc

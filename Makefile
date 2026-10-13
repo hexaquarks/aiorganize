@@ -1,4 +1,4 @@
-.PHONY: dev dev-isolated build test test-qdrant store-status backend build-GroupingsApi
+.PHONY: dev dev-isolated build deploy test test-qdrant store-status backend build-GroupingsApi
 
 dev:
 	uv run python -m src.dev
@@ -8,6 +8,10 @@ dev-isolated:
 
 build:
 	uv run python -m src.build --preview
+
+deploy:
+	SAM_CLI_TELEMETRY=0 sam build
+	SAM_CLI_TELEMETRY=0 sam deploy
 
 store-status:
 	uv run --env-file .env python -m src.webstore status
@@ -32,4 +36,4 @@ build-GroupingsApi:
 	uv pip install --python-version 3.13 --python-platform aarch64-manylinux_2_28 \
 		--only-binary :all: --no-compile-bytecode --target "$(ARTIFACTS_DIR)" -r "$(ARTIFACTS_DIR)/requirements.txt"
 	mkdir -p "$(ARTIFACTS_DIR)/src"
-	cp src/__init__.py src/backend.py src/groupings.py src/access.py src/lambda_handler.py "$(ARTIFACTS_DIR)/src/"
+	cp src/__init__.py src/backend.py src/groupings.py src/lambda_handler.py "$(ARTIFACTS_DIR)/src/"

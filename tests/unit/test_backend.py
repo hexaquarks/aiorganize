@@ -95,12 +95,6 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("private-provider-secret", response.text)
 
-    def test_registration_is_rate_limited(self):
-        for _ in range(10):
-            self.installation()
-
-        self.assertEqual(self.client.post("/v1/installations").status_code, 429)
-
     def test_startup_fails_when_database_cannot_connect(self):
         with patch.object(self.store, "initialize", side_effect=RuntimeError("Database unavailable")):
             with self.assertRaisesRegex(RuntimeError, "Database unavailable"):

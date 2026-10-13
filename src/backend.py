@@ -8,24 +8,20 @@ from typing import Annotated
 from uuid import UUID, uuid4
 
 import jwt
-from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from qdrant_client import QdrantClient
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
 from .groupings import COLLECTION, GroupingsStore, SaveRequest, SearchRequest
-from .access import AccessControl
 
 
 logger = logging.getLogger(__name__)
 bearer = HTTPBearer(auto_error=False)
 
 
-def create_app(store: GroupingsStore, signing_secret: str, access: AccessControl | None = None) -> FastAPI:
+def create_app(store: GroupingsStore, signing_secret: str) -> FastAPI:
     if len(signing_secret) < 32:
         raise ValueError("APP_SIGNING_SECRET must contain at least 32 random characters.")
 
@@ -39,9 +35,6 @@ def create_app(store: GroupingsStore, signing_secret: str, access: AccessControl
             store.client.close()
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
-    limiter = Limiter(key_func=get_remote_address, enabled=access is None)
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     @app.exception_handler(RequestValidationError)
     async def invalid_request(request, error):
@@ -65,18 +58,10 @@ def create_app(store: GroupingsStore, signing_secret: str, access: AccessControl
         except (jwt.InvalidTokenError, ValueError, KeyError):
             raise HTTPException(401, "Invalid installation credential.") from None
 
-        if access:
-            access.check_installation(installation_id)
-
         return installation_id
 
     @app.post("/v1/installations", status_code=201)
-    @limiter.limit("10/hour")
-    def register(request: Request):
-        if access:
-            access.allow(f"registration:{get_remote_address(request)}", 10, 3600)
-            access.allow("registrations", 100, 86400)
-
+    def register():
         # A persistent installation credential avoids accounts and sign-in. Keep the
         # signing secret stable across deployments; rotating it revokes these credentials.
         claims = {
@@ -90,13 +75,7 @@ def create_app(store: GroupingsStore, signing_secret: str, access: AccessControl
         return {"token": token}
 
     @app.post("/v1/groupings")
-    @limiter.limit("30/minute")
-    def save(request: Request, body: SaveRequest, user: Annotated[str, Depends(owner)]):
-        if access:
-            access.allow(f"save:{user}", 30, 60)
-            access.allow(f"groups:{user}", 100, 86400, units=len(body.groups))
-            access.allow("groups", 1000, 86400, units=len(body.groups))
-
+    def save(body: SaveRequest, user: Annotated[str, Depends(owner)]):
         try:
             return store.save(user, body)
         except Exception:
@@ -104,12 +83,7 @@ def create_app(store: GroupingsStore, signing_secret: str, access: AccessControl
             raise HTTPException(503, "Saved groupings are temporarily unavailable.") from None
 
     @app.post("/v1/groupings/search")
-    @limiter.limit("60/minute")
-    def search(request: Request, body: SearchRequest, user: Annotated[str, Depends(owner)]):
-        if access:
-            access.allow(f"search:{user}", 60, 60)
-            access.allow("searches", 10000, 86400)
-
+    def search(body: SearchRequest, user: Annotated[str, Depends(owner)]):
         try:
             return store.search(user, body)
         except Exception:
