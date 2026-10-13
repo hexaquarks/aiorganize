@@ -2,6 +2,8 @@ import type { ModelOption } from "./types";
 
 import { SUPPORTED_MODELS } from "./model-catalog";
 
+const MODEL_LIST_TIMEOUT_MS = 20_000;
+
 export class ModelListError extends Error {}
 
 export async function fetchModels(apiKey: string, signal?: AbortSignal): Promise<ModelOption[]> {
@@ -11,7 +13,7 @@ export async function fetchModels(apiKey: string, signal?: AbortSignal): Promise
 		signals.push(signal);
 	}
 
-	signals.push(AbortSignal.timeout(20000));
+	signals.push(AbortSignal.timeout(MODEL_LIST_TIMEOUT_MS));
 
 	const requestSignal = AbortSignal.any(signals);
 
@@ -57,9 +59,16 @@ export async function fetchModels(apiKey: string, signal?: AbortSignal): Promise
 			id: item.id,
 			name: item.id,
 			created: Number.isFinite(item.created) ? item.created : 0,
-			note: "Available to this key. Test the connection to verify compatibility.",
 		});
 	}
 
-	return [...unique.values()].sort((a, b) => b.created - a.created || a.id.localeCompare(b.id));
+	return [...unique.values()].sort((first, second) => {
+		const newestFirst = second.created - first.created;
+
+		if (newestFirst !== 0) {
+			return newestFirst;
+		}
+
+		return first.id.localeCompare(second.id);
+	});
 }

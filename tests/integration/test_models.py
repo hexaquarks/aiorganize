@@ -45,7 +45,7 @@ class ModelDiscoveryTest(PanelTestCase):
         await self.panel.locator("#api-key").fill("model-list-test-key")
         await self.panel.locator("#api-model").click()
 
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("2 models available with this key.")
+        await expect(self.panel.locator('#model-options [role="option"]')).to_have_count(2)
         await expect(self.panel.get_by_role("listbox")).to_be_visible()
         self.assertEqual(
             await self.panel.get_by_role("option").all_text_contents(),
@@ -125,9 +125,10 @@ class ModelDiscoveryTest(PanelTestCase):
         data += [{"id": model + "-2026-04-23", "created": 100} for model in ids]
         data += [{"id": model, "created": 200} for model in ["gpt-4o", "o1", "o3", "gpt-5"]]
         await self.panel.route("https://api.openai.com/v1/models", lambda route: route.fulfill(json={"data": data}))
-        await self.panel.locator("#api-key").fill("shortlist-test-key")
+        async with self.panel.expect_response("https://api.openai.com/v1/models"):
+            await self.panel.locator("#api-key").fill("shortlist-test-key")
 
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("15 models available with this key.")
+        await expect(self.panel.locator("#model-discovery-status")).to_be_hidden()
 
         await self.panel.locator("#api-model").click()
         options = self.panel.get_by_role("option")
@@ -216,12 +217,12 @@ class ModelDiscoveryTest(PanelTestCase):
 
         await self.panel.route("https://api.openai.com/v1/models", respond)
 
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("Supported models")
+        await expect(self.panel.locator("#model-discovery-status")).to_be_hidden()
         await expect(self.panel.locator("#refresh-models")).to_be_disabled()
 
         await self.panel.locator("#api-key").fill("automatic-discovery-test-key")
 
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("2 models available with this key.")
+        await expect(self.panel.locator('#model-options [role="option"]')).to_have_count(2)
         await expect(self.panel.locator("#api-key")).to_be_focused()
 
         await self.panel.locator("#api-model").click()
@@ -237,7 +238,7 @@ class ModelDiscoveryTest(PanelTestCase):
         await self.panel.locator("#api-key").fill("")
 
         await expect(self.panel.locator("#refresh-models")).to_be_disabled()
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("Supported models")
+        await expect(self.panel.locator("#model-discovery-status")).to_be_hidden()
 
     async def test_saved_unverified_key_loads_models_on_startup(self):
         await self.panel.evaluate("""() => chrome.storage.session.set({apiKey: 'startup-test-key'})""")
@@ -251,7 +252,7 @@ class ModelDiscoveryTest(PanelTestCase):
         await self.panel.route("https://api.openai.com/v1/models", respond)
         await self.panel.reload()
 
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("1 model available with this key.")
+        await expect(self.panel.locator('#model-options [role="option"]')).to_have_count(2)
         self.assertEqual(requests[0].headers["authorization"], "Bearer startup-test-key")
 
         await self.panel.locator("#api-model").click()

@@ -19,26 +19,25 @@ class PackageExtensionTest(unittest.TestCase):
         manifest["version"] = "0.1.0"
         self.files["manifest.json"] = json.dumps(manifest).encode()
 
-    def test_archive_is_reproducible_and_contains_only_runtime_files(self):
+    def test_archive_contains_only_runtime_files(self):
         self.files[".env"] = b"OPENAI_API_KEY=do-not-package"
         self.files["tests/fixture.py"] = b"do-not-package"
-        first = build_zip(self.files, "v0.1.0", [])
-        self.assertEqual(first, build_zip(dict(reversed(list(self.files.items()))), "v0.1.0", []))
-        self.assertNotIn(b"do-not-package", first)
-        with ZipFile(io.BytesIO(first)) as archive:
+        archive_bytes = build_zip(self.files, "v0.1.0", [])
+        self.assertNotIn(b"do-not-package", archive_bytes)
+        with ZipFile(io.BytesIO(archive_bytes)) as archive:
             self.assertEqual(archive.namelist(), sorted(EXTENSION_FILES))
             manifest = json.loads(archive.read("manifest.json"))
             self.assertNotIn("debugger", manifest["permissions"])
             self.assertNotIn("nativeMessaging", manifest["permissions"])
             self.assertNotIn("scripting", manifest["permissions"])
-            self.assertEqual(manifest["host_permissions"], ["https://api.openai.com/*", "https://*.cloud.qdrant.io/*"])
+            self.assertEqual(manifest["host_permissions"], ["https://api.openai.com/*", "http://127.0.0.1:8765/*"])
             self.assertNotIn("page-reader.js", archive.namelist())
             # Development and release execute the same compiled files.
             for name in EXTENSION_FILES:
                 self.assertEqual(archive.read(name), self.files[name])
             self.assertEqual(manifest["version"], "0.1.0")
             for icon in manifest["icons"].values():
-                self.assertTrue(archive.read(icon).startswith(b"\x89PNG\r\n\x1a\n"))
+                self.assertIn(icon, archive.namelist())
 
     def test_version_order_and_tag_alignment(self):
         for tag, previous in (("v0.2.0", []), ("v0.1.0", ["0.1"]), ("v0.1.0", ["0.2.0"])):
@@ -49,7 +48,10 @@ class PackageExtensionTest(unittest.TestCase):
         self.assertEqual(chrome_version("1"), chrome_version("1.0.0.0"))
 
     def test_invalid_chrome_versions(self):
-        for version in ("0", "0.0.0.0", "01.2", "1.01", "1.65536", "1.2.3.4.5", "1.0-beta", "v1", "../1"):
+        for version in (
+            "0", "0.0.0.0", "01.2", "1.01", "1.65536", "1.2.3.4.5",
+            "1.0-beta", "1.0rc1", "1.0+local", "1!1.0", "v1", "../1",
+        ):
             with self.subTest(version=version), self.assertRaises(ValueError):
                 chrome_version(version)
 
@@ -65,6 +67,15 @@ class PackageExtensionTest(unittest.TestCase):
                 path = root / "extension" / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(data)
+
+            (root / "package.json").write_text("{}")
+
+            def compile_tagged_fixture(project, *, install):
+                self.assertTrue(install)
+                return {name: (project / "extension" / name).read_bytes() for name in EXTENSION_FILES}
+
+            self.enterContext(patch.object(build, "build_frontend", side_effect=compile_tagged_fixture))
+
             env = {
                 **os.environ,
                 "GIT_AUTHOR_NAME": "Test",
@@ -77,7 +88,7 @@ class PackageExtensionTest(unittest.TestCase):
                 subprocess.run(["git", "-C", directory, *args], check=True, capture_output=True, env=env)
 
             run_git("init")
-            run_git("add", "extension")
+            run_git("add", "extension", "package.json")
             run_git("-c", "commit.gpgsign=false", "commit", "-m", "Test")
             run_git("tag", "v0.1.0")
             (root / "extension/runtime/panel.js").write_text("dirty change")
@@ -86,7 +97,8 @@ class PackageExtensionTest(unittest.TestCase):
                 with patch("sys.argv", ["build", "--tag", "v0.1.0"]):
                     build.main()
             archive = root / "dist/aiorganize-v0.1.0.zip"
-            self.assertEqual(archive.read_bytes(), build_zip(self.files, "v0.1.0", []))
+            with ZipFile(archive) as package:
+                self.assertEqual({name: package.read(name) for name in package.namelist()}, self.files)
 
             # Exercise the real tag-history check, not just an explicitly supplied baseline.
             manifest = json.loads(self.files["manifest.json"])
@@ -108,7 +120,8 @@ class PackageExtensionTest(unittest.TestCase):
             with patch.object(build, "PROJECT", root):
                 with patch("sys.argv", ["build", "--tag", "v0.1.0"]):
                     build.main()
-            self.assertEqual(archive.read_bytes(), build_zip(self.files, "v0.1.0", []))
+            with ZipFile(archive) as package:
+                self.assertEqual({name: package.read(name) for name in package.namelist()}, self.files)
 
     def test_release_rejects_symlink_assets(self):
         with tempfile.TemporaryDirectory() as directory:

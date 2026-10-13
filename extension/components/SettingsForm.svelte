@@ -42,6 +42,7 @@
 <form
 	id="api-settings"
 	class="card"
+	aria-labelledby="heading"
 	hidden={!connection.editing}
 	aria-busy={connection.testing}
 	bind:this={form}
@@ -50,7 +51,6 @@
 		void connection.verify();
 	}}
 >
-	<h2 class="settings-heading">AI model</h2>
 	<fieldset id="settings-fields" disabled={connection.testing}>
 		<div class="flex items-center justify-between">
 			<label id="key-label" for="api-key">OpenAI API key</label>
@@ -79,15 +79,14 @@
 				</svg>
 			</button>
 		</div>
-		<p class="note">Requires OpenAI API billing.</p>
-		<div class="flex items-center justify-between">
+		<div class="model-label-row flex items-center justify-between">
 			<label id="model-label" for="api-model">Model</label>
 			<button
 				id="refresh-models"
 				class="text-button"
 				type="button"
 				disabled={connection.testing || discovery.loading || !connection.draft.apiKey.trim()}
-				onclick={() => refresh(true)}>Refresh models</button
+				onclick={() => refresh(true)}>{discovery.loading ? "Refreshing…" : "Refresh models"}</button
 			>
 		</div>
 		<ModelPicker
@@ -97,13 +96,16 @@
 			onopen={() => refresh()}
 			onchange={() => (connection.feedback = null)}
 		/>
-		<p id="model-discovery-status" class="note model-discovery-status" role="status" aria-live="polite">
+		<p
+			id="model-discovery-status"
+			class="note model-discovery-status"
+			hidden={!discovery.status}
+			role="status"
+			aria-live="polite"
+		>
 			{discovery.status}
 		</p>
-		<p id="model-note" class="note">{modelNote || "Test to verify model compatibility."}</p>
-		<p id="key-storage" class="note" hidden={!connection.saved.verifiedAt}>
-			Saved key · {connection.saved.remember ? "Remembered on this device" : "Session only"}
-		</p>
+		<p id="model-note" class="note" hidden={!modelNote || Boolean(discovery.status)}>{modelNote}</p>
 		<label class="remember">
 			<input
 				id="remember-key"
@@ -114,7 +116,9 @@
 			<span
 				>Remember key on this device
 				<small
-					>Stored locally without encryption; never synced. When unchecked, the key lasts until Chrome quits.</small
+					>{connection.draft.remember
+						? "Stored unencrypted. Never synced."
+						: "Removed when Chrome quits."}</small
 				>
 			</span>
 		</label>
@@ -129,7 +133,7 @@
 		<span class="spinner" aria-hidden="true"></span>
 		<span id="test-label">{connection.testing ? "Checking model…" : "Verify & save"}</span>
 	</button>
-	<p class="footnote">Runs a small API test. Charges may apply.</p>
+	<p class="footnote">Verification may incur a small API charge.</p>
 	<div
 		id="settings-status"
 		class="feedback {connection.testing ? 'checking' : connection.feedback?.kind || ''}"

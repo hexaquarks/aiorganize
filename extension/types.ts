@@ -1,3 +1,7 @@
+export function isRecord(value: unknown): value is Record<string, unknown> {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
 export interface PageInfo {
 	id: string;
 	title: string;
@@ -40,13 +44,6 @@ export interface Connection {
 export interface ModelOption {
 	id: string;
 	name: string;
-	note: string;
+	note?: string;
 	created?: number;
-}
-
-export interface QdrantConnection {
-	url: string;
-	apiKey: string;
-	remember: boolean;
-	verifiedAt: string | null;
 }

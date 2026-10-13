@@ -43,7 +43,7 @@ class ConnectionSetupTest(PanelTestCase):
 
         await expect(self.panel.locator("#ready")).to_be_visible()
         await self.panel.locator("#settings-toggle").click()
-        await expect(self.panel.locator("#key-storage")).to_contain_text("Session only")
+        await expect(self.panel.locator("#remember-key")).not_to_be_checked()
         await self.panel.locator("#cancel-settings").click()
 
         await self.reopen_browser()
@@ -63,7 +63,7 @@ class ConnectionSetupTest(PanelTestCase):
 
         await expect(self.panel.locator("#ready")).to_be_visible()
         await self.panel.locator("#settings-toggle").click()
-        await expect(self.panel.locator("#key-storage")).to_contain_text("Remembered on this device")
+        await expect(self.panel.locator("#remember-key")).to_be_checked()
         await self.panel.locator("#cancel-settings").click()
         await expect(self.panel.locator("#organize")).to_be_enabled()
         stores = await self.panel.evaluate("""async () => ({

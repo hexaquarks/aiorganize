@@ -3,6 +3,8 @@ import { ConnectionError, testConnection } from "./llm";
 import { ModelDiscovery } from "./discovery.svelte";
 import type { Connection } from "./types";
 
+const MAX_MODEL_ID_LENGTH = 100;
+
 function emptyConnection(): Connection {
 	return { apiKey: "", model: DEFAULT_MODEL, remember: false, verifiedAt: null };
 }
@@ -79,7 +81,7 @@ export class ConnectionState {
 
 		const keyHasLineBreaks = /[\r\n]/.test(draft.apiKey);
 		// Model IDs are short identifiers, not URLs or arbitrary input.
-		const validModelId = /^[a-zA-Z0-9._:-]{1,100}$/.test(draft.model);
+		const validModelId = draft.model.length <= MAX_MODEL_ID_LENGTH && /^[a-zA-Z0-9._:-]+$/.test(draft.model);
 
 		if (keyHasLineBreaks || !validModelId) {
 			this.feedback = new ConnectionError("invalid", "Enter a valid key and model ID.", "Retry");

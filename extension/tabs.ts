@@ -1,5 +1,8 @@
 import type { PendingProposal, TabInfo } from "./types";
 
+// Chrome's move API uses -1 to append a group after the last tab in its window.
+const END_OF_WINDOW_INDEX = -1;
+
 const GROUP_COLORS: { name: `${chrome.tabGroups.Color}`; hex: string }[] = [
 	{ name: "blue", hex: "#1a73e8" },
 	{ name: "green", hex: "#188038" },
@@ -118,7 +121,7 @@ export async function applyGroups({ groups, snapshot, window_id }: PendingPropos
 		}
 
 		if (otherGroupId !== undefined) {
-			await chrome.tabGroups.move(otherGroupId, { index: -1 });
+			await chrome.tabGroups.move(otherGroupId, { index: END_OF_WINDOW_INDEX });
 		}
 	} catch (error) {
 		// Browser mutations are not transactional; report partial work instead of claiming success.

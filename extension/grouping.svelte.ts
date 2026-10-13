@@ -1,9 +1,9 @@
 import { requestProposal } from "./llm";
 import { validateProposal } from "./proposal";
 import { applyGroups, getTabState } from "./tabs";
-import { getQdrantSettings, getSavedGroupingsUserId, getSettings } from "./settings";
-import { GroupingVectorStore } from "./vector-store";
-import type { ApprovedGroup } from "./vector-store";
+import { getSettings } from "./settings";
+import { SavedGroupings } from "./saved-groupings";
+import type { ApprovedGroup } from "./saved-groupings";
 import type { GroupingExample, PageInfo, PendingProposal } from "./types";
 
 export class GroupingState {
@@ -85,20 +85,12 @@ export class GroupingState {
 
 	private async retrieveGroupings(snapshot: PageInfo[]): Promise<GroupingExample[]> {
 		try {
-			const qdrant = await getQdrantSettings();
-
-			if (!qdrant.verifiedAt) {
-				return [];
-			}
-
 			this.status = "Finding saved grouping examples…";
 			const openai = await getSettings();
-			const userId = await getSavedGroupingsUserId();
-			const store = new GroupingVectorStore(qdrant, openai.apiKey, userId);
+			const store = new SavedGroupings(openai.apiKey);
 			const query = JSON.stringify({ pages: snapshot.map(({ title, url }) => ({ title, url })) });
 
-			const matches = await store.search(query, 5, this.controller.signal);
-			const examples = matches.map((match) => match.savedGrouping);
+			const examples = await store.search(query, this.controller.signal);
 
 			if (examples.length) {
 				this.retrievalStatus = "Suggestions informed by your saved groupings.";
@@ -166,15 +158,6 @@ export class GroupingState {
 		this.savedGroupingsStatus = "";
 
 		try {
-			const qdrant = await getQdrantSettings();
-
-			if (!qdrant.verifiedAt) {
-				this.groupsToSave = null;
-				console.debug("Skipping saved groupings: Qdrant has no verified connection.");
-
-				return;
-			}
-
 			this.savedGroupingsStatus = "Saving approved groupings…";
 
 			const openai = await getSettings();
@@ -183,8 +166,7 @@ export class GroupingState {
 				throw new Error("Connect OpenAI to save approved groupings.");
 			}
 
-			const userId = await getSavedGroupingsUserId();
-			const store = new GroupingVectorStore(qdrant, openai.apiKey, userId);
+			const store = new SavedGroupings(openai.apiKey);
 
 			await store.saveGroups(this.groupsToSave, this.controller.signal);
 
@@ -196,9 +178,8 @@ export class GroupingState {
 			}
 
 			// Keep this failure separate from Chrome application, which already completed.
-			console.warn("Could not save approved groupings. Check the saved groupings connection in Settings.");
-			this.savedGroupingsStatus =
-				"Groupings weren’t saved for next time. Retry or check saved groupings in Settings.";
+			console.warn("Could not save approved groupings. Check the app backend.");
+			this.savedGroupingsStatus = "Groupings weren’t saved for next time. Please retry in a moment.";
 			this.canRetrySave = true;
 		}
 	}

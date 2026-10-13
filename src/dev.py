@@ -16,6 +16,8 @@ from .build import PROJECT, build_frontend
 EXTENSION_PATH = PROJECT / "extension"
 CHROME_ARGS = ["--enable-unsafe-extension-debugging"]
 DEFAULT_PROFILE = Path.home() / ".aiorganize" / "chrome"
+# Playwright uses zero to disable the deadline while the developer keeps Chrome open.
+NO_BROWSER_CLOSE_TIMEOUT = 0
 
 
 def _macos_chrome() -> tuple[list[Path], Path, str]:
@@ -131,7 +133,7 @@ async def run_dev(profile: Path, *, check: bool = False) -> None:
             if check:
                 return
 
-            await context.wait_for_event("close", timeout=0)
+            await context.wait_for_event("close", timeout=NO_BROWSER_CLOSE_TIMEOUT)
         finally:
             await context.close()
 
@@ -144,7 +146,7 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        build_frontend(development=not args.check)
+        build_frontend(development=True)
 
         if args.isolated or args.check or args.profile:
             profile = (args.profile or DEFAULT_PROFILE).resolve()
