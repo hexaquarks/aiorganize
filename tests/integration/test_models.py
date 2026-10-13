@@ -45,7 +45,7 @@ class ModelDiscoveryTest(PanelTestCase):
         await self.panel.locator("#api-key").fill("model-list-test-key")
         await self.panel.locator("#api-model").click()
 
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("then newest")
+        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("2 models available with this key.")
         await expect(self.panel.get_by_role("listbox")).to_be_visible()
         self.assertEqual(
             await self.panel.get_by_role("option").all_text_contents(),
@@ -127,7 +127,7 @@ class ModelDiscoveryTest(PanelTestCase):
         await self.panel.route("https://api.openai.com/v1/models", lambda route: route.fulfill(json={"data": data}))
         await self.panel.locator("#api-key").fill("shortlist-test-key")
 
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("15 account models loaded")
+        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("15 models available with this key.")
 
         await self.panel.locator("#api-model").click()
         options = self.panel.get_by_role("option")
@@ -150,7 +150,7 @@ class ModelDiscoveryTest(PanelTestCase):
             await route.fulfill(status=403, json={"error": {"message": "SECRET PROVIDER DETAIL"}})
 
         await self.panel.route("https://api.openai.com/v1/models", respond)
-        await self.panel.locator("#edit-connection").click()
+        await self.panel.locator("#settings-toggle").click()
 
         await expect(self.panel.locator("#model-discovery-status")).to_contain_text(
             "OpenAI denied model-list access (403)"
@@ -221,7 +221,7 @@ class ModelDiscoveryTest(PanelTestCase):
 
         await self.panel.locator("#api-key").fill("automatic-discovery-test-key")
 
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("2 account models loaded")
+        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("2 models available with this key.")
         await expect(self.panel.locator("#api-key")).to_be_focused()
 
         await self.panel.locator("#api-model").click()
@@ -251,7 +251,7 @@ class ModelDiscoveryTest(PanelTestCase):
         await self.panel.route("https://api.openai.com/v1/models", respond)
         await self.panel.reload()
 
-        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("1 account models loaded")
+        await expect(self.panel.locator("#model-discovery-status")).to_contain_text("1 model available with this key.")
         self.assertEqual(requests[0].headers["authorization"], "Bearer startup-test-key")
 
         await self.panel.locator("#api-model").click()

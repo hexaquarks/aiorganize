@@ -6,21 +6,20 @@
 	let {
 		connection,
 		grouping,
-		onedit,
+		savedGroupingsConnected,
 	}: {
 		connection: ConnectionState;
 		grouping: GroupingState;
-		onedit: () => void;
+		savedGroupingsConnected: boolean;
 	} = $props();
 
 	const label = $derived(
 		SUPPORTED_MODELS.find((item) => item.id === connection.saved.model)?.name || connection.saved.model,
 	);
-	const verified = $derived(new Date(connection.saved.verifiedAt || Date.now()));
 
 	const organizeLabel = $derived.by(() => {
 		if (grouping.busy) {
-			return "Working…";
+			return "Please wait…";
 		}
 
 		if (grouping.tabCount) {
@@ -33,37 +32,29 @@
 	});
 </script>
 
-<section id="ready" hidden={!connection.connected}>
-	<div class="connection">
-		<span class="connection-check" aria-hidden="true">✓</span>
-		<div>
-			<strong>OpenAI connected</strong>
-			<p id="connection-detail">
-				{label} · {connection.saved.remember ? "Remembered on this device" : "Session only"}
-			</p>
-		</div>
-		<button id="edit-connection" class="text-button" type="button" disabled={grouping.busy} onclick={onedit}
-			>Edit</button
-		>
-	</div>
-	<time id="verified-time" datetime={verified.toISOString()} title={verified.toLocaleString()}>
-		{Date.now() - verified.getTime() > 60000 ? `Last tested ${verified.toLocaleString()}` : "Last tested just now"}
-	</time>
+<section id="ready" hidden={!connection.connected || Boolean(grouping.pending)} aria-label="Organize your tabs">
 	<div class="card organize-card">
-		<div class="illustration" aria-hidden="true">
-			{#each ["Work", "Research", "Shopping"] as category}
-				<div class="sample {category.toLowerCase()}"><span>{category}</span><i></i><i></i></div>
-			{/each}
+		<div class="window-label">CURRENT WINDOW</div>
+		<div class="tab-total">
+			<strong>{grouping.tabCount}</strong><span>open {grouping.tabCount === 1 ? "tab" : "tabs"}</span>
 		</div>
+		<p class="organize-description">Turn your open tabs into topic groups.</p>
 		<button
 			id="organize"
 			class="primary"
 			type="button"
-			disabled={grouping.busy || !connection.connected}
+			disabled={grouping.busy || !connection.connected || Boolean(grouping.pending)}
 			onclick={() => grouping.organize()}
 		>
 			<span aria-hidden="true">✦</span><span id="organize-label">{organizeLabel}</span>
 		</button>
-		<p class="footnote">Tab titles and URLs are sent to OpenAI.</p>
+		<p class="review-note">Review the suggestions before anything changes.</p>
 	</div>
+	<p id="connection-detail" class="model-summary">Powered by OpenAI · {label}</p>
+	<p class="data-note">
+		Tab titles and URLs are sent to OpenAI. Page contents stay private.
+		{#if savedGroupingsConnected}
+			Approved groupings are also saved to guide future suggestions.
+		{/if}
+	</p>
 </section>

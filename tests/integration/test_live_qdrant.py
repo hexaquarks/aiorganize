@@ -164,6 +164,8 @@ class LiveQdrantTest(PanelTestCase):
         self.assertEqual(proposal_inputs[-1]["saved_groupings"], examples)
         self.assertNotIn("BOnly", json.dumps(proposal_inputs[-1]))
 
+        await self.panel.locator("#reject").click()
+
         await self.panel.evaluate(
             "userId => chrome.storage.local.set({savedGroupingsUserId: userId})", user_b,
         )
