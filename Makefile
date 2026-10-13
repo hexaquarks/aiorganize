@@ -32,4 +32,4 @@ build-GroupingsApi:
 	uv pip install --python-version 3.13 --python-platform aarch64-manylinux_2_28 \
 		--only-binary :all: --no-compile-bytecode --target "$(ARTIFACTS_DIR)" -r "$(ARTIFACTS_DIR)/requirements.txt"
 	mkdir -p "$(ARTIFACTS_DIR)/src"
-	cp src/__init__.py src/backend.py src/groupings.py src/lambda_handler.py "$(ARTIFACTS_DIR)/src/"
+	cp src/__init__.py src/backend.py src/groupings.py src/access.py src/lambda_handler.py "$(ARTIFACTS_DIR)/src/"

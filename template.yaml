@@ -40,9 +40,58 @@ Resources:
           QDRANT_API_KEY: !Ref QdrantApiKey
           QDRANT_COLLECTION: !Ref QdrantCollection
           APP_SIGNING_SECRET: !Ref AppSigningSecret
-      # Installation credentials are verified by the app, not AWS IAM.
-      FunctionUrlConfig:
-        AuthType: NONE
+          ACCESS_TABLE: !Ref AccessTable
+      Events:
+        Register:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/installations
+            Method: POST
+        Save:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/groupings
+            Method: POST
+        Search:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /v1/groupings/search
+            Method: POST
+        Health:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /health
+            Method: GET
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 10
+        ThrottlingRateLimit: 2
+
+  AccessTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      OnDemandThroughput:
+        MaxReadRequestUnits: 20
+        MaxWriteRequestUnits: 20
 
   ApiRole:
     Type: AWS::IAM::Role
@@ -62,6 +111,9 @@ Resources:
               - Effect: Allow
                 Action: [logs:CreateLogStream, logs:PutLogEvents]
                 Resource: !GetAtt ApiLogs.Arn
+              - Effect: Allow
+                Action: [dynamodb:GetItem, dynamodb:UpdateItem]
+                Resource: !GetAtt AccessTable.Arn
 
   ApiLogs:
     Type: AWS::Logs::LogGroup
@@ -71,4 +123,6 @@ Resources:
 
 Outputs:
   ApiUrl:
-    Value: !GetAtt GroupingsApiUrl.FunctionUrl
+    Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}'
+  AccessTableName:
+    Value: !Ref AccessTable
