@@ -65,6 +65,15 @@ class PackageExtensionTest(unittest.TestCase):
                 path = root / "extension" / name
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(data)
+
+            (root / "package.json").write_text("{}")
+
+            def compile_tagged_fixture(project, *, install):
+                self.assertTrue(install)
+                return {name: (project / "extension" / name).read_bytes() for name in EXTENSION_FILES}
+
+            self.enterContext(patch.object(build, "build_frontend", side_effect=compile_tagged_fixture))
+
             env = {
                 **os.environ,
                 "GIT_AUTHOR_NAME": "Test",
@@ -77,7 +86,7 @@ class PackageExtensionTest(unittest.TestCase):
                 subprocess.run(["git", "-C", directory, *args], check=True, capture_output=True, env=env)
 
             run_git("init")
-            run_git("add", "extension")
+            run_git("add", "extension", "package.json")
             run_git("-c", "commit.gpgsign=false", "commit", "-m", "Test")
             run_git("tag", "v0.1.0")
             (root / "extension/runtime/panel.js").write_text("dirty change")

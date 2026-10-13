@@ -15,22 +15,6 @@ from zipfile import ZIP_STORED, ZipFile, ZipInfo
 
 PROJECT = Path(__file__).resolve().parents[1]
 # An explicit list prevents local configuration and development utilities entering releases.
-LEGACY_EXTENSION_FILES = (
-    "background.js",
-    "manifest.json",
-    "panel.css",
-    "panel.html",
-    "panel.js",
-    "llm.js",
-    "tabs.js",
-    "settings.js",
-    "model-picker.js",
-    "models.js",
-    "model-catalog.js",
-    "proposal.js",
-    "icons/brand.png",
-)
-
 EXTENSION_FILES = (
     "runtime/background.js",
     "manifest.json",
@@ -90,7 +74,7 @@ def build_zip(files: dict[str, bytes], tag: str, previous_versions: list[str]) -
     output = io.BytesIO()
 
     with ZipFile(output, "w", compression=ZIP_STORED) as archive:
-        for name in sorted(LEGACY_EXTENSION_FILES if "settings.js" in files else EXTENSION_FILES):
+        for name in sorted(EXTENSION_FILES):
             data = files[name]
             entry = ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
             entry.create_system = 3
@@ -118,25 +102,12 @@ def tagged_files(tag: str) -> dict[str, bytes]:
         if any(member.issym() or member.islnk() for member in members.values()):
             raise ValueError("Release assets must be regular files.")
 
-        if "package.json" in members:
-            with tempfile.TemporaryDirectory(prefix="aiorganize-release-") as directory:
-                archive.extractall(directory, filter="data")
-                return build_frontend(Path(directory), install=True)
+        if "package.json" not in members:
+            raise ValueError("Release tags must contain the current frontend build configuration.")
 
-        # Older tags predate the frontend compiler and contain browser-ready JavaScript.
-        names = LEGACY_EXTENSION_FILES if "extension/settings.js" in members else EXTENSION_FILES
-        files = {}
-
-        for name in names:
-            member = archive.getmember(f"extension/{name}")
-
-            if not member.isfile():
-                raise ValueError(f"Release assets must be regular files: {name}")
-
-            with archive.extractfile(member) as source:
-                files[name] = source.read()
-
-        return files
+        with tempfile.TemporaryDirectory(prefix="aiorganize-release-") as directory:
+            archive.extractall(directory, filter="data")
+            return build_frontend(Path(directory), install=True)
 
 
 def main() -> None:
