@@ -5,7 +5,7 @@
 	"description": "Preview AI topic groups for your tabs, then approve to apply. Uses your OpenAI API key directly in Chrome.",
 	"icons": { "16": "icons/brand.png", "32": "icons/brand.png", "48": "icons/brand.png", "128": "icons/brand.png" },
 	"minimum_chrome_version": "123",
-	"permissions": ["tabs", "tabGroups", "sidePanel", "storage"],
+	"permissions": ["tabs", "tabGroups", "sidePanel", "storage", "favicon"],
 	"host_permissions": ["https://api.openai.com/*", "http://127.0.0.1:8765/*"],
 	"action": { "default_title": "Organize tabs" },
 	"side_panel": { "default_path": "panel.html" },

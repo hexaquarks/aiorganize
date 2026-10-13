@@ -480,11 +480,10 @@ li:hover {
 	@apply grid place-items-center;
 	flex: 0 0 28px;
 	height: 28px;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	color: var(--muted);
-	font-size: 11px;
-	font-weight: 600;
+}
+
+.tab-icon img {
+	object-fit: contain;
 }
 
 .tab-text {

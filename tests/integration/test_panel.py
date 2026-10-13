@@ -335,7 +335,7 @@ class ExtensionPanelTest(PanelTestCase):
         self.finish_proposal.set()
         await expect(self.panel.locator("#preview")).to_be_visible()
         await expect(self.panel.locator(".tab-title").first).to_have_text("<img src=x onerror=alert(1)>")
-        self.assertEqual(await self.panel.locator("#groups img").count(), 0)
+        self.assertEqual(await self.panel.locator(".tab-title img").count(), 0)
         await self.assert_no_groups()
 
     async def test_preview_stays_scoped_to_panel_window(self):

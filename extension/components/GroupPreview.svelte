@@ -14,7 +14,19 @@
 		onreject: () => void;
 	} = $props();
 
+	// Request a sharper icon for displays that use two physical pixels per CSS pixel.
+	const FAVICON_SIZE_PX = 32;
+
 	const tabs = $derived(new Map(pending?.snapshot.map((tab) => [tab.id, tab]) || []));
+
+	// Chrome serves cached icons and a default icon for pages without one.
+	function faviconUrl(pageUrl: string) {
+		const url = new URL(chrome.runtime.getURL("/_favicon/"));
+		url.searchParams.set("pageUrl", pageUrl);
+		url.searchParams.set("size", String(FAVICON_SIZE_PX));
+
+		return url.href;
+	}
 
 	function siteLabel(url: string) {
 		try {
@@ -46,7 +58,9 @@
 						{@const tab = tabs.get(id)!}
 						{@const site = siteLabel(tab.url)}
 						<li>
-							<span class="tab-icon" aria-hidden="true">{site.charAt(0).toUpperCase()}</span>
+							<span class="tab-icon" aria-hidden="true">
+								<img src={faviconUrl(tab.url)} alt="" width="16" height="16" />
+							</span>
 							<div class="min-w-0">
 								<span class="tab-title" title={tab.title || "Untitled tab"}
 									>{tab.title || "Untitled tab"}</span
