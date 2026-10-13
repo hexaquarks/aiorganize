@@ -10,9 +10,40 @@
 	--muted: #657195;
 	--border: #dce1f3;
 	--accent: #4d36f4;
+	--button-background: #4d36f4;
+	--subtle-surface: #f4f5fb;
+	--hover-surface: #f5f6fb;
+	--accent-surface: #eeebff;
+	--badge-surface: #eae6ff;
+	--error-surface: #fff2f3;
+	--error-border: #ffc4c9;
+	--warning-surface: #fff9ef;
+	--warning-border: #ffdb9c;
+	--spinner-track: #d2caff;
 	color: var(--text);
 	background: var(--background);
 	font-size: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+	:root {
+		color-scheme: dark;
+		--background: #181818;
+		--surface: #242424;
+		--text: #f5f5f5;
+		--muted: #a3a3a3;
+		--border: #404040;
+		--accent: #e0e0e0;
+		--subtle-surface: #2b2b2b;
+		--hover-surface: #333333;
+		--accent-surface: #333333;
+		--badge-surface: #333333;
+		--error-surface: #3e272e;
+		--error-border: #78434e;
+		--warning-surface: #3c3224;
+		--warning-border: #776039;
+		--spinner-track: #525252;
+	}
 }
 
 * {
@@ -185,7 +216,7 @@ button {
 	border: 0;
 	border-radius: 9px;
 	padding: 10px 14px;
-	background: var(--accent);
+	background: var(--button-background);
 	color: white;
 	font: inherit;
 	font-weight: 600;
@@ -272,7 +303,7 @@ button:disabled {
 	padding: 12px 14px;
 	border: 1px solid var(--border);
 	border-radius: 9px;
-	background: #f4f5fb;
+	background: var(--subtle-surface);
 	font-size: 14px;
 	overflow-wrap: anywhere;
 }
@@ -283,18 +314,18 @@ button:disabled {
 }
 
 .feedback.auth {
-	background: #fff2f3;
-	border-color: #ffc4c9;
+	background: var(--error-surface);
+	border-color: var(--error-border);
 }
 
 .feedback.billing {
-	background: #fff9ef;
-	border-color: #ffdb9c;
+	background: var(--warning-surface);
+	border-color: var(--warning-border);
 }
 
 .feedback.checking {
 	padding-left: 44px;
-	background: #eeebff;
+	background: var(--accent-surface);
 	border-color: transparent;
 }
 
@@ -305,7 +336,7 @@ button:disabled {
 	top: 18px;
 	width: 17px;
 	height: 17px;
-	border: 2px solid #d2caff;
+	border: 2px solid var(--spinner-track);
 	border-top-color: var(--accent);
 	border-radius: 50%;
 	animation: spin 0.8s linear infinite;
@@ -380,7 +411,7 @@ h2 {
 
 .preview-badge {
 	color: var(--accent);
-	background: #eae6ff;
+	background: var(--badge-surface);
 	padding: 4px 7px;
 	border-radius: 6px;
 	font-size: 10px;
@@ -407,7 +438,7 @@ h2 {
 	gap: 8px;
 	padding: 13px;
 	margin-bottom: 6px;
-	background: color-mix(in srgb, var(--group-color) 18%, white);
+	background: color-mix(in srgb, var(--group-color) 18%, var(--surface));
 }
 
 h3 {
@@ -424,7 +455,7 @@ h3 {
 	font-size: 11px;
 	padding: 4px 8px;
 	border-radius: 6px;
-	background: #ffffffb0;
+	background: color-mix(in srgb, var(--surface) 70%, transparent);
 }
 
 ul {
@@ -442,7 +473,7 @@ li {
 }
 
 li:hover {
-	background: #f5f6fb;
+	background: var(--hover-surface);
 }
 
 .tab-icon {
@@ -519,16 +550,18 @@ li:hover {
 	height: 22px;
 	border-radius: 50%;
 	background: var(--muted);
-	color: white;
+	color: var(--background);
 	font-weight: 700;
 }
 .feedback.auth::before {
 	content: "!";
 	background: #f32636;
+	color: white;
 }
 .feedback.billing::before {
 	content: "!";
 	background: #f5a400;
+	color: #17181e;
 }
 .feedback > a,
 .feedback > button {
@@ -594,7 +627,7 @@ li:hover {
 }
 .model-option:hover,
 .model-option:focus-visible {
-	background: #eeebff;
+	background: var(--accent-surface);
 	outline: none;
 	filter: none;
 }
