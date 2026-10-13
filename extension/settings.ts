@@ -1,7 +1,6 @@
-import type { Connection, QdrantConnection } from "./types";
+import type { Connection } from "./types";
 
 import { SUPPORTED_MODELS } from "./model-catalog";
-import { validate as isUuid } from "uuid";
 
 export const DEFAULT_MODEL = SUPPORTED_MODELS[0].id;
 
@@ -14,30 +13,6 @@ interface StoredSettings {
 async function restrictStorage() {
 	await chrome.storage.local.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
 	await chrome.storage.session.setAccessLevel({ accessLevel: "TRUSTED_CONTEXTS" });
-}
-
-export async function getSavedGroupingsUserId(): Promise<string> {
-	await restrictStorage();
-
-	// Multiple panels can open at once. Give this Chrome profile one persistent identity.
-	return navigator.locks.request("saved-groupings-user-id", async () => {
-		const { savedGroupingsUserId } = await chrome.storage.local.get<{ savedGroupingsUserId?: string }>(
-			"savedGroupingsUserId",
-		);
-
-		if (savedGroupingsUserId !== undefined) {
-			if (!isUuid(savedGroupingsUserId)) {
-				throw new Error("Your saved grouping identity is invalid.");
-			}
-
-			return savedGroupingsUserId;
-		}
-
-		const userId = crypto.randomUUID();
-
-		await chrome.storage.local.set({ savedGroupingsUserId: userId });
-		return userId;
-	});
 }
 
 export async function getSettings(): Promise<Connection> {
@@ -89,37 +64,9 @@ export async function clearKey() {
 	await chrome.storage.local.remove(["connection", "apiKey", "model"]);
 }
 
-export async function getQdrantSettings(): Promise<QdrantConnection> {
+export async function removeLegacyDatabaseCredentials() {
 	await restrictStorage();
 
-	const local = await chrome.storage.local.get<{ qdrant?: Omit<QdrantConnection, "remember"> }>("qdrant");
-	const session = await chrome.storage.session.get<{ qdrant?: Omit<QdrantConnection, "remember"> }>("qdrant");
-	const connection = session.qdrant || local.qdrant;
-
-	if (connection) {
-		return { ...connection, remember: !session.qdrant };
-	}
-
-	return { url: "", apiKey: "", remember: false, verifiedAt: null };
-}
-
-export async function saveQdrantSettings({ url, apiKey, remember, verifiedAt }: QdrantConnection) {
-	await restrictStorage();
-
-	if (!url || !apiKey || !verifiedAt) {
-		throw new Error("Test the Qdrant connection before saving it.");
-	}
-
-	const target = remember ? chrome.storage.local : chrome.storage.session;
-	const other = remember ? chrome.storage.session : chrome.storage.local;
-
-	await target.set({ qdrant: { url, apiKey, verifiedAt } });
-	await other.remove("qdrant");
-}
-
-export async function clearQdrantSettings() {
-	await restrictStorage();
-
-	await chrome.storage.session.remove("qdrant");
 	await chrome.storage.local.remove("qdrant");
+	await chrome.storage.session.remove("qdrant");
 }

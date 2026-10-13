@@ -6,26 +6,32 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig(({ mode }) => {
 	const development = mode === "development";
-	const databaseTest = mode === "qdrant-test";
-	const environment = development || databaseTest ? loadEnv(mode, process.cwd(), "QDRANT_") : {};
+	const testing = mode === "test";
+	const environment = loadEnv(mode, process.cwd(), "APP_API_URL");
+	const apiUrl =
+		process.env.APP_API_URL || environment.APP_API_URL || (development || testing ? "http://127.0.0.1:8765" : "");
 
-	if (databaseTest && (!environment.QDRANT_ENDPOINT || !environment.QDRANT_API_KEY)) {
-		throw new Error("Live database tests require QDRANT_ENDPOINT and QDRANT_API_KEY in .env.");
+	if (!apiUrl) {
+		throw new Error("Set APP_API_URL to the deployed app backend before building a release.");
 	}
 
-	let outDir = "../dist/extension";
+	const endpoint = new URL(apiUrl);
+	const localDevelopment = (development || testing) && endpoint.hostname === "127.0.0.1";
 
-	if (development) {
-		outDir = "../dist/development";
-	} else if (databaseTest) {
-		outDir = "../dist/qdrant-test";
+	if ((!localDevelopment && endpoint.protocol !== "https:") || endpoint.username || endpoint.password) {
+		throw new Error("The app backend must use HTTPS. Local HTTP is allowed only for development and tests.");
 	}
+
+	if (endpoint.pathname !== "/" || endpoint.search || endpoint.hash) {
+		throw new Error("APP_API_URL must be an origin without a path, query, or fragment.");
+	}
+
+	const outDir = development ? "../dist/development" : "../dist/extension";
+	const manifest = JSON.parse(readFileSync(resolve("extension/manifest.json"), "utf8"));
+	manifest.host_permissions = ["https://api.openai.com/*", `${endpoint.origin}/*`];
 
 	return {
-		define: {
-			"import.meta.env.QDRANT_ENDPOINT": JSON.stringify(environment.QDRANT_ENDPOINT || ""),
-			"import.meta.env.QDRANT_API_KEY": JSON.stringify(environment.QDRANT_API_KEY || ""),
-		},
+		define: { "import.meta.env.APP_API_URL": JSON.stringify(endpoint.origin) },
 		root: "extension",
 		base: "./",
 		publicDir: false,
@@ -39,17 +45,16 @@ export default defineConfig(({ mode }) => {
 						this.emitFile({
 							type: "asset",
 							fileName,
-							source: readFileSync(resolve("extension", fileName)),
+							source:
+								fileName === "manifest.json"
+									? JSON.stringify(manifest)
+									: readFileSync(resolve("extension", fileName)),
 						});
 					}
 
 					this.emitFile({ type: "asset", fileName: "LICENSE", source: readFileSync("LICENSE") });
 				},
 				writeBundle(_, bundle) {
-					if (databaseTest) {
-						return;
-					}
-
 					// Keep an existing unpacked installation usable after each rebuild.
 					for (const [fileName, asset] of Object.entries(bundle)) {
 						if (!fileName.startsWith("runtime/")) {

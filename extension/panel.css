@@ -150,33 +150,6 @@ input:not([type="checkbox"]) {
 	line-height: 1.5;
 }
 
-details {
-	margin: 16px 0;
-}
-
-summary {
-	cursor: pointer;
-	padding: 4px 0;
-	color: var(--text);
-	font-size: 15px;
-	font-weight: 600;
-}
-
-details[open] summary {
-	margin-bottom: 20px;
-}
-
-.optional-label {
-	margin-left: 8px;
-	font-size: 12px;
-	font-weight: 400;
-	color: var(--muted);
-}
-
-details label {
-	margin-top: 14px;
-}
-
 .remember {
 	display: flex;
 	align-items: flex-start;

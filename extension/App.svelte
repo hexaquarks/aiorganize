@@ -1,8 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from "svelte";
 	import { ConnectionState } from "./connection.svelte";
-	import { QdrantConnectionState } from "./qdrant-connection.svelte";
-	import QdrantSettings from "./components/QdrantSettings.svelte";
 	import { GroupingState } from "./grouping.svelte";
 	import SettingsForm from "./components/SettingsForm.svelte";
 	import ReadyPanel from "./components/ReadyPanel.svelte";
@@ -11,7 +9,6 @@
 
 	const connection = new ConnectionState();
 	const grouping = new GroupingState();
-	const qdrant = new QdrantConnectionState();
 	const heading = $derived.by(() => {
 		if (!connection.editing) {
 			return "A little order for your tabs.";
@@ -22,13 +19,11 @@
 
 	onMount(() => {
 		void connection.load();
-		void qdrant.load();
 
 		const stopWatching = grouping.watch();
 
 		return () => {
 			connection.destroy();
-			qdrant.destroy();
 			stopWatching();
 		};
 	});
@@ -91,7 +86,7 @@
 			class="text-button muted"
 			hidden={connection.editing}
 			type="button"
-			disabled={grouping.busy || connection.testing || qdrant.testing}
+			disabled={grouping.busy || connection.testing}
 			onclick={editConnection}><Icon name="settings" /> Settings</button
 		>
 		<button
@@ -99,7 +94,7 @@
 			class="text-button"
 			type="button"
 			hidden={!connection.editing || !connection.saved.verifiedAt}
-			disabled={connection.testing || qdrant.testing}
+			disabled={connection.testing}
 			onclick={closeSettings}>Back</button
 		>
 	</header>
@@ -112,11 +107,13 @@
 		</p>
 	</div>
 	<SettingsForm {connection} />
-	<ReadyPanel {connection} {grouping} savedGroupingsConnected={Boolean(qdrant.saved.verifiedAt)} />
-	<QdrantSettings connection={qdrant} visible={connection.editing} />
+	<ReadyPanel {connection} {grouping} />
 	<p id="privacy-note" class="privacy-note" hidden={!connection.editing}>
 		<Icon name="privacy" />
-		<span> Tab titles and URLs are sent to OpenAI when you organize. Page contents are never read. </span>
+		<span>
+			Tab titles and URLs are sent to OpenAI when you organize. AI Organize stores approved group names, tab
+			titles, and URLs for future suggestions. Page contents are never read.
+		</span>
 	</p>
 	<div id="connection-actions" hidden={!connection.editing || !connection.saved.apiKey} inert={connection.testing}>
 		<button

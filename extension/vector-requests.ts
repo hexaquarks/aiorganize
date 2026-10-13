@@ -20,7 +20,7 @@ export function hasStatus(error: unknown, status: number): boolean {
 }
 
 export async function runVectorRequest<T>(
-	service: "OpenAI" | "Qdrant",
+	service: "OpenAI",
 	signal: AbortSignal | undefined,
 	request: (options: RequestInit) => Promise<T>,
 ): Promise<T> {
@@ -48,7 +48,7 @@ export async function runVectorRequest<T>(
 
 		// SDK errors can contain keys or page data. Show only messages we control.
 		if (hasStatus(error, 401) || hasStatus(error, 403)) {
-			const requiredAccess = service === "OpenAI" ? "embeddings" : "the saved groupings collection";
+			const requiredAccess = "embeddings";
 
 			throw new Error(`${service} key rejected. Check access to ${requiredAccess}.`);
 		}

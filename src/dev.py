@@ -144,7 +144,7 @@ def main() -> None:
     args = parser.parse_args()
 
     try:
-        build_frontend(development=not args.check)
+        build_frontend(development=True)
 
         if args.isolated or args.check or args.profile:
             profile = (args.profile or DEFAULT_PROFILE).resolve()

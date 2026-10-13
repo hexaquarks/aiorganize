@@ -6,11 +6,9 @@
 	let {
 		connection,
 		grouping,
-		savedGroupingsConnected,
 	}: {
 		connection: ConnectionState;
 		grouping: GroupingState;
-		savedGroupingsConnected: boolean;
 	} = $props();
 
 	const label = $derived(
@@ -52,9 +50,7 @@
 	</div>
 	<p id="connection-detail" class="model-summary">Powered by OpenAI · {label}</p>
 	<p class="data-note">
-		Tab titles and URLs are sent to OpenAI. Page contents stay private.
-		{#if savedGroupingsConnected}
-			Approved groupings are also saved to guide future suggestions.
-		{/if}
+		Tab titles and URLs are sent to OpenAI. Page contents stay private. Approved groupings are saved by AI Organize
+		to guide future suggestions.
 	</p>
 </section>

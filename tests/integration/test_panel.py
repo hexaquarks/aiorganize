@@ -3,6 +3,12 @@ import json
 import tempfile
 import unittest
 
+from fastapi.testclient import TestClient
+from qdrant_client import QdrantClient
+
+from src.backend import create_app
+from src.groupings import GroupingsStore
+
 from playwright.async_api import async_playwright, expect
 
 from src.dev import CHROME_ARGS, load_extension
@@ -38,6 +44,25 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
                 }
             ),
         )
+        self.database = QdrantClient(":memory:")
+        self.store = GroupingsStore(self.database, "saved_groupings_test")
+        self.backend = self.enterContext(TestClient(create_app(self.store, "offline-test-secret-" * 3)))
+
+        async def backend_request(route):
+            from urllib.parse import urlparse
+
+            response = await asyncio.to_thread(
+                self.backend.request, route.request.method, urlparse(route.request.url).path,
+                json=route.request.post_data_json, headers=dict(route.request.headers),
+            )
+            await route.fulfill(status=response.status_code, json=response.json())
+
+        await self.panel.route("http://127.0.0.1:8765/**", backend_request)
+        await self.panel.route("https://api.openai.com/v1/embeddings", lambda route: route.fulfill(json={
+            "model": "text-embedding-3-small",
+            "data": [{"index": index, "embedding": [1.0] + [0.0] * 1535}
+                     for index in range(len(route.request.post_data_json["input"]))],
+        }))
         await self.panel.goto(f"chrome-extension://{extension_id}/panel.html")
         await expect(self.panel.locator("#approve")).to_be_disabled(timeout=20000)
 
@@ -132,18 +157,12 @@ class ExtensionPanelTest(PanelTestCase):
     async def test_home_prioritizes_organizing_and_keeps_configuration_in_settings(self):
         await self.panel.set_viewport_size({"width": 320, "height": 640})
         await self.connect()
-        await self.panel.evaluate("""async () => {
-            await chrome.storage.session.set({qdrant: {
-                url: 'https://test.cloud.qdrant.io:6333', apiKey: 'offline-database-key',
-                verifiedAt: '2026-10-12T12:00:00Z',
-            }});
-        }""")
         await self.panel.reload()
 
         await expect(self.panel.locator("#organize")).to_be_in_viewport()
         await expect(self.panel.locator(".tab-total")).to_have_text("6open tabs")
         await expect(self.panel.locator("#ready")).to_contain_text("Review the suggestions before anything changes.")
-        await expect(self.panel.locator("#ready")).to_contain_text("Approved groupings are also saved")
+        await expect(self.panel.locator("#ready")).to_contain_text("Approved groupings are saved by AI Organize")
         await expect(self.panel.locator("#forget-key")).to_be_hidden()
         self.assertNotIn("Qdrant", await self.panel.locator("body").inner_text())
         self.assertNotIn("Last tested", await self.panel.locator("body").inner_text())
@@ -154,9 +173,8 @@ class ExtensionPanelTest(PanelTestCase):
 
         await expect(self.panel.locator("#organize")).to_be_hidden()
         await expect(self.panel.locator("#forget-key")).to_be_visible()
-        await expect(self.panel.locator("#qdrant-settings")).to_be_hidden()
-        await self.panel.locator("#saved-groupings-settings summary").click()
-        await expect(self.panel.locator("#qdrant-settings")).to_be_visible()
+        await expect(self.panel.locator("#qdrant-settings")).to_have_count(0)
+        self.assertNotIn("Qdrant", await self.panel.locator("body").inner_text())
         await self.panel.locator("#cancel-settings").click()
         await expect(self.panel.locator("#organize")).to_be_visible()
         await self.assert_no_groups()

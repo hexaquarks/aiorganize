@@ -1,10 +1,10 @@
 import { mount, unmount } from "svelte";
 import App from "./App.svelte";
-import { loadDevSettings } from "./dev-settings";
+import { removeLegacyDatabaseCredentials } from "./settings";
 import "./panel.css";
 
 async function startPanel() {
-	await loadDevSettings();
+	await removeLegacyDatabaseCredentials();
 
 	const app = mount(App, { target: document.getElementById("app")! });
 
