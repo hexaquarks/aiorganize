@@ -100,19 +100,15 @@
 	</header>
 	<div class="welcome" hidden={!connection.editing && Boolean(grouping.pending)}>
 		<h1 id="heading">{heading}</h1>
-		<p id="intro">
-			{connection.editing
-				? "Choose your model and how to save your settings."
-				: "Find the topics. Keep your focus."}
-		</p>
+		<p id="intro" hidden={connection.editing}>Find the topics. Keep your focus.</p>
 	</div>
 	<SettingsForm {connection} />
 	<ReadyPanel {connection} {grouping} />
 	<p id="privacy-note" class="privacy-note" hidden={!connection.editing}>
 		<Icon name="privacy" />
 		<span>
-			Tab titles and URLs are sent to OpenAI when you organize. AI Organize stores approved group names, tab
-			titles, and URLs for future suggestions. Page contents are never read.
+			Organizing sends tab titles and URLs to OpenAI. AI Organize saves approved groupings for future suggestions.
+			Page contents aren’t read.
 		</span>
 	</p>
 	<div id="connection-actions" hidden={!connection.editing || !connection.saved.apiKey} inert={connection.testing}>

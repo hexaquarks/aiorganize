@@ -154,6 +154,7 @@ input:not([type="checkbox"]) {
 	display: flex;
 	align-items: flex-start;
 	gap: 10px;
+	margin-top: 20px;
 	margin-bottom: 26px;
 	font-size: 14px;
 	line-height: 1.5;
@@ -680,8 +681,8 @@ li:hover {
 	color: var(--muted);
 }
 
-.settings-heading {
-	margin-bottom: 20px;
+.model-label-row {
+	margin-top: 20px;
 }
 
 .preview-note {

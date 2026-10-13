@@ -59,7 +59,6 @@ export async function fetchModels(apiKey: string, signal?: AbortSignal): Promise
 			id: item.id,
 			name: item.id,
 			created: Number.isFinite(item.created) ? item.created : 0,
-			note: "Available to this key. Test the connection to verify compatibility.",
 		});
 	}
 

@@ -44,6 +44,6 @@ export interface Connection {
 export interface ModelOption {
 	id: string;
 	name: string;
-	note: string;
+	note?: string;
 	created?: number;
 }

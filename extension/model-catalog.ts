@@ -19,10 +19,4 @@ export const SUPPORTED_MODELS: ModelOption[] = [
 	{ id: "gpt-5.4-nano", name: "GPT-5.4 nano" },
 	{ id: "gpt-5.2", name: "GPT-5.2" },
 	{ id: "gpt-5-mini", name: "GPT-5 Mini" },
-].map((model) => ({
-	...model,
-	note:
-		model.id === "gpt-4.1-mini"
-			? "Fast and affordable for grouping tabs."
-			: "Supports tab grouping. Test the connection to verify access with your key.",
-}));
+];

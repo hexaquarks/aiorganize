@@ -9,7 +9,7 @@ const CACHE_DURATION_MS = 5 * 60 * 1000;
 
 export class ModelDiscovery {
 	models = $state<ModelOption[]>([...SUPPORTED_MODELS]);
-	status = $state("Supported models · enter your key to check account availability.");
+	status = $state("");
 	loading = $state(false);
 
 	private controller: AbortController | null = null;
@@ -30,7 +30,7 @@ export class ModelDiscovery {
 
 		this.models = [...SUPPORTED_MODELS];
 		this.loadedKey = "";
-		this.status = "Supported models · enter your key to check account availability.";
+		this.status = "";
 	}
 
 	preserve(model: string) {
@@ -43,7 +43,7 @@ export class ModelDiscovery {
 			{
 				id: model,
 				name: SUPPORTED_MODELS.find((item) => item.id === model)?.name || model,
-				note: "Not listed for this key. Test the connection to check access.",
+				note: "Not listed for this key.",
 			},
 		];
 	}
@@ -71,7 +71,7 @@ export class ModelDiscovery {
 		const controller = new AbortController();
 		this.controller = controller;
 		this.loading = true;
-		this.status = "Loading available models…";
+		this.status = "";
 
 		try {
 			const items = await fetchModels(apiKey, controller.signal);
@@ -99,11 +99,9 @@ export class ModelDiscovery {
 
 			this.loadedKey = apiKey;
 			this.loadedAt = Date.now();
-			if (items.length) {
-				const modelLabel = items.length === 1 ? "model" : "models";
+			this.status = "";
 
-				this.status = `${items.length} ${modelLabel} available with this key.`;
-			} else {
+			if (!items.length) {
 				this.status = "No supported models found for this key. Check project access or refresh.";
 			}
 		} catch (error) {
