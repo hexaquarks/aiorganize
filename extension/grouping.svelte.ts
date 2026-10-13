@@ -67,7 +67,7 @@ export class GroupingState {
 			}
 
 			this.pending = { groups: validateProposal(proposal, snapshot), snapshot, window_id: window.id };
-			this.status = "Review the groups below. Your tabs haven’t changed.";
+			this.status = "";
 		} catch (error) {
 			if (!this.controller.signal.aborted) {
 				this.status = error instanceof Error ? error.message : "Could not organize tabs.";

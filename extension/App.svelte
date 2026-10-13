@@ -126,7 +126,7 @@
 		>
 	</div>
 	<div class="status-line" hidden={connection.editing}>
-		<span id="activity" class:spinning={grouping.busy} aria-hidden="true"></span>
+		<span id="activity" class:spinning={grouping.busy} hidden={!grouping.busy} aria-hidden="true"></span>
 		<p id="status" role="status" aria-live="polite">{grouping.status}</p>
 	</div>
 	<p

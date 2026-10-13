@@ -419,7 +419,7 @@ h2 {
 }
 
 #summary {
-	margin: 7px 0 16px;
+	margin: 8px 0;
 	color: var(--muted);
 	font-size: 12px;
 }
@@ -480,11 +480,10 @@ li:hover {
 	@apply grid place-items-center;
 	flex: 0 0 28px;
 	height: 28px;
-	border: 1px solid var(--border);
-	border-radius: 8px;
-	color: var(--muted);
-	font-size: 11px;
-	font-weight: 600;
+}
+
+.tab-icon img {
+	object-fit: contain;
 }
 
 .tab-text {
@@ -718,8 +717,19 @@ li:hover {
 	margin-top: 20px;
 }
 
+.preview-header {
+	margin-bottom: 20px;
+}
+
+.preview-heading-row {
+	display: flex;
+	align-items: baseline;
+	justify-content: space-between;
+	gap: 12px;
+}
+
 .preview-note {
-	margin: -6px 0 20px;
+	margin: 0;
 	color: var(--muted);
 	font-size: 12px;
 	line-height: 1.5;
@@ -727,6 +737,7 @@ li:hover {
 
 #preview-heading {
 	font-size: 22px;
+	line-height: 1.25;
 }
 
 .status-line {
