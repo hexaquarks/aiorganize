@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 from playwright.async_api import expect
 from qdrant_client import QdrantClient, models
 
-from src.backend import create_app
+from src.api import create_app
 from src.groupings import COLLECTION, GroupingsStore
 from tests.integration.test_panel import PanelTestCase
 

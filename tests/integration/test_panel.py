@@ -6,7 +6,7 @@ import unittest
 from fastapi.testclient import TestClient
 from qdrant_client import QdrantClient
 
-from src.backend import create_app
+from src.api import create_app
 from src.groupings import GroupingsStore
 
 from playwright.async_api import async_playwright, expect

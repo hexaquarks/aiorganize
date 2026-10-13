@@ -5,7 +5,10 @@ from functools import cache
 
 from mangum import Mangum
 
-from .backend import create_app, store_from_environment
+from .api import create_app, store_from_environment
+
+
+MAX_REQUEST_BYTES = 1024 * 1024
 
 
 @cache
@@ -21,7 +24,10 @@ def application():
 
 def handler(event, context):
     # Reject oversized bodies before JSON parsing or opening database connections.
-    if len((event.get("body") or "").encode("utf-8")) > 1024 * 1024:
+    body = event.get("body") or ""
+    body_size = len(body.encode("utf-8"))
+
+    if body_size > MAX_REQUEST_BYTES:
         return {"statusCode": 413, "body": '{"detail":"Request is too large."}'}
 
     return application()(event, context)

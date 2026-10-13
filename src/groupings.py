@@ -96,15 +96,20 @@ class GroupingsStore:
 
     def save(self, owner: str, request: SaveRequest):
         points = []
+
         for group in request.groups:
             pages = [page.model_dump() for page in group.pages]
-            # Sort a copy so approval order stays intact, but retries have stable IDs.
-            canonical = json.dumps(
-                {"name": group.name, "pages": sorted(pages, key=lambda page: (page["title"], page["url"]))},
-                ensure_ascii=False, separators=(",", ":"),
-            )
-            point_id = str(uuid5(NAMESPACE_URL, f"{self.collection}:{owner}:{canonical}"))
-            points.append(models.PointStruct(id=point_id, vector=group.vector, payload={
+
+            # Preserve approval order in the payload. Sort and consistently encode a copy
+            # for the ID so retrying an approval overwrites the same database record.
+            identity = {
+                "name": group.name,
+                "pages": sorted(pages, key=lambda page: (page["title"], page["url"])),
+            }
+            identity_text = json.dumps(identity, ensure_ascii=False, separators=(",", ":"))
+            point_id = str(uuid5(NAMESPACE_URL, f"{self.collection}:{owner}:{identity_text}"))
+
+            payload = {
                 "userId": owner,
                 "name": group.name,
                 "pages": pages,
@@ -112,32 +117,47 @@ class GroupingsStore:
                 "schemaVersion": 1,
                 "embeddingModel": EMBEDDING_MODEL,
                 "embeddingDimensions": DIMENSIONS,
-            }))
+            }
+            points.append(models.PointStruct(id=point_id, vector=group.vector, payload=payload))
 
         result = self.client.upsert(self.collection, points, wait=True)
+
         if result.status != models.UpdateStatus.COMPLETED:
             raise RuntimeError("Database write was not confirmed.")
+
         return {"ids": [point.id for point in points]}
 
     def search(self, owner: str, request: SearchRequest):
         constraints = {
-            "userId": owner, "schemaVersion": 1,
-            "embeddingModel": EMBEDDING_MODEL, "embeddingDimensions": DIMENSIONS,
+            "userId": owner,
+            "schemaVersion": 1,
+            "embeddingModel": EMBEDDING_MODEL,
+            "embeddingDimensions": DIMENSIONS,
         }
+        conditions = [
+            models.FieldCondition(key=key, match=models.MatchValue(value=value))
+            for key, value in constraints.items()
+        ]
+
         result = self.client.query_points(
-            self.collection, query=request.vector, limit=request.limit,
-            query_filter=models.Filter(must=[
-                models.FieldCondition(key=key, match=models.MatchValue(value=value))
-                for key, value in constraints.items()
-            ]),
-            with_payload=True, with_vectors=False,
+            self.collection,
+            query=request.vector,
+            limit=request.limit,
+            query_filter=models.Filter(must=conditions),
+            with_payload=True,
+            with_vectors=False,
         )
+
         groups = []
+
         for point in result.points:
             payload = point.payload or {}
+
             if any(payload.get(key) != value for key, value in constraints.items()):
                 continue
+
             # Return only model context, never database fields or another owner's records.
             pages = [Page.model_validate(page).model_dump() for page in payload["pages"][:5]]
             groups.append({"name": payload["name"], "pages": pages})
+
         return {"groups": groups}

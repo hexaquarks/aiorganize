@@ -5,7 +5,7 @@ import jwt
 from fastapi.testclient import TestClient
 from qdrant_client import QdrantClient
 
-from src.backend import create_app
+from src.api import create_app
 from src.groupings import GroupingsStore
 
 
@@ -85,6 +85,22 @@ class BackendTest(unittest.TestCase):
     def test_signing_secret_is_required(self):
         with self.assertRaises(ValueError):
             create_app(self.store, "")
+
+    def test_app_instances_keep_separate_databases_and_signing_secrets(self):
+        other_store = GroupingsStore(QdrantClient(":memory:"), "other_installations_test")
+        other_secret = "another-independent-signing-secret-for-tests"
+        first = self.installation()
+
+        with TestClient(create_app(other_store, other_secret)) as other_client:
+            response = other_client.post("/v1/installations")
+            second = {"Authorization": f"Bearer {response.json()['token']}"}
+            payload = {"groups": [group()]}
+
+            self.assertEqual(other_client.post("/v1/groupings", headers=first, json=payload).status_code, 401)
+            self.assertEqual(self.client.post("/v1/groupings", headers=second, json=payload).status_code, 401)
+            self.assertEqual(other_client.post("/v1/groupings", headers=second, json=payload).status_code, 200)
+            self.assertEqual(other_store.client.count("other_installations_test").count, 1)
+            self.assertEqual(self.database.count("saved_groupings_test").count, 0)
 
     def test_database_errors_do_not_expose_provider_details(self):
         headers = self.installation()
