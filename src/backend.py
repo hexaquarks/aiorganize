@@ -104,14 +104,17 @@ def create_app(store: GroupingsStore, signing_secret: str) -> FastAPI:
     return app
 
 
-def from_environment() -> FastAPI:
+def store_from_environment() -> GroupingsStore:
     endpoint = os.environ.get("QDRANT_ENDPOINT", "")
     key = os.environ.get("QDRANT_API_KEY", "")
-    secret = os.environ.get("APP_SIGNING_SECRET", "")
 
     if not endpoint or not key:
         raise ValueError("Configure QDRANT_ENDPOINT and QDRANT_API_KEY on the backend.")
 
     client = QdrantClient(url=endpoint, api_key=key, timeout=30, check_compatibility=False)
     collection = os.environ.get("QDRANT_COLLECTION", COLLECTION)
-    return create_app(GroupingsStore(client, collection), secret)
+    return GroupingsStore(client, collection)
+
+
+def from_environment() -> FastAPI:
+    return create_app(store_from_environment(), os.environ.get("APP_SIGNING_SECRET", ""))

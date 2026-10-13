@@ -1,4 +1,5 @@
 AGENTS.md
+.aws-sam/
 .venv/
 __pycache__/
 *.pyc

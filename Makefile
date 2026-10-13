@@ -1,4 +1,4 @@
-.PHONY: dev dev-isolated build test test-qdrant store-status backend
+.PHONY: dev dev-isolated build test test-qdrant store-status backend build-GroupingsApi
 
 dev:
 	uv run python -m src.dev
@@ -24,3 +24,12 @@ test-qdrant:
 
 backend:
 	uv run --env-file .env uvicorn src.backend:from_environment --factory --host 127.0.0.1 --port 8765
+
+build-GroupingsApi:
+	test -n "$(ARTIFACTS_DIR)"
+	uv export --locked --no-dev --no-emit-project --prune playwright --prune uvicorn \
+		--quiet > "$(ARTIFACTS_DIR)/requirements.txt"
+	uv pip install --python-version 3.13 --python-platform aarch64-manylinux_2_28 \
+		--only-binary :all: --no-compile-bytecode --target "$(ARTIFACTS_DIR)" -r "$(ARTIFACTS_DIR)/requirements.txt"
+	mkdir -p "$(ARTIFACTS_DIR)/src"
+	cp src/__init__.py src/backend.py src/groupings.py src/lambda_handler.py "$(ARTIFACTS_DIR)/src/"

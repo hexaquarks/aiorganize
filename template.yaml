@@ -1,0 +1,74 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: AI Organize saved groupings API
+
+Parameters:
+  QdrantEndpoint:
+    Type: String
+    AllowedPattern: 'https://.+'
+  QdrantApiKey:
+    Type: String
+    NoEcho: true
+    MinLength: 1
+  AppSigningSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+  QdrantCollection:
+    Type: String
+    Default: aiorganize_groups_v1_text_embedding_3_small_1536
+
+Resources:
+  GroupingsApi:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+      BuildArchitecture: arm64
+    Properties:
+      CodeUri: .
+      Handler: src.lambda_handler.handler
+      Runtime: python3.13
+      Architectures: [arm64]
+      MemorySize: 512
+      Timeout: 30
+      Role: !GetAtt ApiRole.Arn
+      LoggingConfig:
+        LogGroup: !Ref ApiLogs
+      Environment:
+        Variables:
+          QDRANT_ENDPOINT: !Ref QdrantEndpoint
+          QDRANT_API_KEY: !Ref QdrantApiKey
+          QDRANT_COLLECTION: !Ref QdrantCollection
+          APP_SIGNING_SECRET: !Ref AppSigningSecret
+      # Installation credentials are verified by the app, not AWS IAM.
+      FunctionUrlConfig:
+        AuthType: NONE
+
+  ApiRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: WriteApiLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [logs:CreateLogStream, logs:PutLogEvents]
+                Resource: !GetAtt ApiLogs.Arn
+
+  ApiLogs:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${AWS::StackName}-api'
+      RetentionInDays: 7
+
+Outputs:
+  ApiUrl:
+    Value: !GetAtt GroupingsApiUrl.FunctionUrl
