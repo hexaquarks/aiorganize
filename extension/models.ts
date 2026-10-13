@@ -2,6 +2,8 @@ import type { ModelOption } from "./types";
 
 import { SUPPORTED_MODELS } from "./model-catalog";
 
+const MODEL_LIST_TIMEOUT_MS = 20_000;
+
 export class ModelListError extends Error {}
 
 export async function fetchModels(apiKey: string, signal?: AbortSignal): Promise<ModelOption[]> {
@@ -11,7 +13,7 @@ export async function fetchModels(apiKey: string, signal?: AbortSignal): Promise
 		signals.push(signal);
 	}
 
-	signals.push(AbortSignal.timeout(20000));
+	signals.push(AbortSignal.timeout(MODEL_LIST_TIMEOUT_MS));
 
 	const requestSignal = AbortSignal.any(signals);
 

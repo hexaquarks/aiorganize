@@ -4,6 +4,7 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
+from http import HTTPStatus
 from typing import Annotated
 from uuid import UUID, uuid4
 
@@ -20,6 +21,9 @@ from .groupings import COLLECTION, GroupingsStore, SaveRequest, SearchRequest
 logger = logging.getLogger(__name__)
 router = APIRouter()
 bearer = HTTPBearer(auto_error=False)
+MAX_INSTALLATION_TOKEN_LENGTH = 4096
+MIN_SIGNING_SECRET_LENGTH = 32
+DATABASE_TIMEOUT_SECONDS = 30
 
 
 def get_store(request: Request) -> GroupingsStore:
@@ -31,7 +35,7 @@ def installation_id(
     credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
 ) -> str:
     try:
-        if not credentials or len(credentials.credentials) > 4096:
+        if not credentials or len(credentials.credentials) > MAX_INSTALLATION_TOKEN_LENGTH:
             raise ValueError("Missing installation credential.")
 
         claims = jwt.decode(
@@ -45,10 +49,10 @@ def installation_id(
 
         return str(UUID(claims["sub"]))
     except (jwt.InvalidTokenError, ValueError, KeyError):
-        raise HTTPException(401, "Invalid installation credential.") from None
+        raise HTTPException(HTTPStatus.UNAUTHORIZED, "Invalid installation credential.") from None
 
 
-@router.post("/v1/installations", status_code=201)
+@router.post("/v1/installations", status_code=HTTPStatus.CREATED)
 def register(request: Request):
     # Keep the signing secret stable across deployments so installations retain access.
     claims = {
@@ -72,7 +76,7 @@ def save(
         return store.save(user, body)
     except Exception:
         logger.error("Saving groupings failed. Check the backend database connection.")
-        raise HTTPException(503, "Saved groupings are temporarily unavailable.") from None
+        raise HTTPException(HTTPStatus.SERVICE_UNAVAILABLE, "Saved groupings are temporarily unavailable.") from None
 
 
 @router.post("/v1/groupings/search")
@@ -85,7 +89,7 @@ def search(
         return store.search(user, body)
     except Exception:
         logger.error("Retrieving groupings failed. Check the backend database connection.")
-        raise HTTPException(503, "Saved groupings are temporarily unavailable.") from None
+        raise HTTPException(HTTPStatus.SERVICE_UNAVAILABLE, "Saved groupings are temporarily unavailable.") from None
 
 
 @router.get("/health")
@@ -94,12 +98,12 @@ def health():
 
 
 async def invalid_request(request: Request, error: RequestValidationError):
-    return JSONResponse({"detail": "Invalid grouping request."}, status_code=422)
+    return JSONResponse({"detail": "Invalid grouping request."}, status_code=HTTPStatus.UNPROCESSABLE_ENTITY)
 
 
 def create_app(store: GroupingsStore, signing_secret: str) -> FastAPI:
-    if len(signing_secret) < 32:
-        raise ValueError("APP_SIGNING_SECRET must contain at least 32 random characters.")
+    if len(signing_secret) < MIN_SIGNING_SECRET_LENGTH:
+        raise ValueError(f"APP_SIGNING_SECRET must contain at least {MIN_SIGNING_SECRET_LENGTH} random characters.")
 
     @asynccontextmanager
     async def lifespan(app):
@@ -126,7 +130,7 @@ def store_from_environment() -> GroupingsStore:
     if not endpoint or not key:
         raise ValueError("Configure QDRANT_ENDPOINT and QDRANT_API_KEY on the backend.")
 
-    client = QdrantClient(url=endpoint, api_key=key, timeout=30, check_compatibility=False)
+    client = QdrantClient(url=endpoint, api_key=key, timeout=DATABASE_TIMEOUT_SECONDS, check_compatibility=False)
     collection = os.environ.get("QDRANT_COLLECTION", COLLECTION)
     return GroupingsStore(client, collection)
 

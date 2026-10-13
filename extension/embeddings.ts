@@ -5,6 +5,7 @@ import { isRecord } from "./types";
 export const EMBEDDING_MODEL = "text-embedding-3-small";
 export const EMBEDDING_DIMENSIONS = 1536;
 const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_EMBEDDING_INPUTS = 1000;
 
 export async function embedTexts(texts: string[], apiKey: string, signal?: AbortSignal): Promise<number[][]> {
 	const key = apiKey.trim();
@@ -16,10 +17,14 @@ export async function embedTexts(texts: string[], apiKey: string, signal?: Abort
 	}
 
 	const validInputs =
-		texts.length > 0 && texts.length <= 1000 && texts.every((text) => typeof text === "string" && text.trim());
+		texts.length > 0 &&
+		texts.length <= MAX_EMBEDDING_INPUTS &&
+		texts.every((text) => typeof text === "string" && text.trim());
 
 	if (!validInputs) {
-		throw new Error("Enter between 1 and 1,000 nonempty embedding inputs.");
+		throw new Error(
+			`Enter between 1 and ${MAX_EMBEDDING_INPUTS.toLocaleString("en-US")} nonempty embedding inputs.`,
+		);
 	}
 
 	const client = new OpenAI({
@@ -100,18 +105,16 @@ async function requestEmbeddings(client: OpenAI, texts: string[], signal?: Abort
 		}
 
 		// SDK errors can contain keys or page data. Show only messages we control.
-		const status = error instanceof OpenAI.APIError ? error.status : undefined;
-
-		if (status === 401 || status === 403) {
+		if (error instanceof OpenAI.AuthenticationError || error instanceof OpenAI.PermissionDeniedError) {
 			throw new Error("OpenAI key rejected. Check access to embeddings.");
 		}
 
-		if (status === 429) {
+		if (error instanceof OpenAI.RateLimitError) {
 			throw new Error("OpenAI is busy or quota is exhausted. Try again shortly.");
 		}
 
-		if (status !== undefined) {
-			throw new Error(`OpenAI request failed (${status}). Check the connection and try again.`);
+		if (error instanceof OpenAI.APIError && error.status !== undefined) {
+			throw new Error(`OpenAI request failed (${error.status}). Check the connection and try again.`);
 		}
 
 		if (error instanceof TypeError || error instanceof OpenAI.APIConnectionError) {

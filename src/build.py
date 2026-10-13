@@ -145,7 +145,7 @@ def main() -> None:
             ancestors = git("tag", "--merged", f"refs/tags/{tag}").decode().splitlines()
             ancestors = [ancestor for ancestor in ancestors if ancestor != tag]
 
-        previous = [ancestor[1:] for ancestor in ancestors if ancestor.startswith("v")]
+        previous = [ancestor.removeprefix("v") for ancestor in ancestors if ancestor.startswith("v")]
 
         if args.previous_version:
             previous.append(args.previous_version)

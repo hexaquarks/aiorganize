@@ -2,6 +2,7 @@
 
 import os
 from functools import cache
+from http import HTTPStatus
 
 from mangum import Mangum
 
@@ -28,6 +29,6 @@ def handler(event, context):
     body_size = len(body.encode("utf-8"))
 
     if body_size > MAX_REQUEST_BYTES:
-        return {"statusCode": 413, "body": '{"detail":"Request is too large."}'}
+        return {"statusCode": HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "body": '{"detail":"Request is too large."}'}
 
     return application()(event, context)

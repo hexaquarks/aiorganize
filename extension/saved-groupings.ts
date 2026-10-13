@@ -1,8 +1,10 @@
 import { embedTexts } from "./embeddings";
 import { isRecord } from "./types";
 import type { GroupingExample } from "./types";
+import { MAX_GROUPING_EXAMPLES } from "./limits";
 
 const API_URL = import.meta.env.APP_API_URL;
+const REQUEST_TIMEOUT_MS = 30_000;
 
 export interface ApprovedGroup extends GroupingExample {
 	approvedAt: string;
@@ -15,7 +17,7 @@ async function request(path: string, body: unknown, token?: string, signal?: Abo
 		headers.Authorization = `Bearer ${token}`;
 	}
 
-	const signals = [AbortSignal.timeout(30000)];
+	const signals = [AbortSignal.timeout(REQUEST_TIMEOUT_MS)];
 
 	if (signal) {
 		signals.push(signal);
@@ -101,9 +103,9 @@ export class SavedGroupings {
 	async search(query: string, signal?: AbortSignal): Promise<GroupingExample[]> {
 		const token = await getInstallationToken(signal);
 		const [vector] = await embedTexts([query], this.openaiKey, signal);
-		const response = await request("/v1/groupings/search", { vector, limit: 5 }, token, signal);
+		const response = await request("/v1/groupings/search", { vector, limit: MAX_GROUPING_EXAMPLES }, token, signal);
 
-		if (!isRecord(response) || !Array.isArray(response.groups) || response.groups.length > 5) {
+		if (!isRecord(response) || !Array.isArray(response.groups) || response.groups.length > MAX_GROUPING_EXAMPLES) {
 			throw new Error("Invalid saved grouping response.");
 		}
 

@@ -1,5 +1,6 @@
 import type { PageInfo, ProposedGroup } from "./types";
 import { isRecord } from "./types";
+import { MAX_GROUP_NAME_LENGTH } from "./limits";
 
 function readGroup(value: unknown): ProposedGroup {
 	const invalidGroupMessage = "The proposed groups are invalid. Organize again to get a new preview.";
@@ -16,7 +17,7 @@ function readGroup(value: unknown): ProposedGroup {
 
 	const name = value.name;
 	const tabIds = value.tab_ids;
-	const validName = Boolean(name.trim()) && name.length <= 7;
+	const validName = Boolean(name.trim()) && name.length <= MAX_GROUP_NAME_LENGTH;
 
 	if (!validName || !tabIds.length || !tabIds.every((id): id is string => typeof id === "string")) {
 		throw new Error(invalidGroupMessage);

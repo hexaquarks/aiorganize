@@ -12,6 +12,14 @@ from qdrant_client import QdrantClient, models
 COLLECTION = "aiorganize_groups_v1_text_embedding_3_small_1536"
 EMBEDDING_MODEL = "text-embedding-3-small"
 DIMENSIONS = 1536
+MAX_GROUP_NAME_LENGTH = 7
+MAX_PAGE_TITLE_LENGTH = 4096
+MAX_PAGE_URL_LENGTH = 8192
+MAX_PAGES_PER_SAVE = 1000
+MAX_GROUPS_PER_SAVE = 100
+MAX_GROUPING_EXAMPLES = 5
+MAX_PAGES_PER_EXAMPLE = 5
+SAVED_GROUPING_SCHEMA_VERSION = 1
 Vector = Annotated[list[FiniteFloat], Field(min_length=DIMENSIONS, max_length=DIMENSIONS)]
 
 
@@ -20,8 +28,8 @@ class StrictModel(BaseModel):
 
 
 class Page(StrictModel):
-    title: str = Field(max_length=4096)
-    url: str = Field(max_length=8192)
+    title: str = Field(max_length=MAX_PAGE_TITLE_LENGTH)
+    url: str = Field(max_length=MAX_PAGE_URL_LENGTH)
 
 
 class VectorInput(StrictModel):
@@ -36,8 +44,8 @@ class VectorInput(StrictModel):
 
 
 class ApprovedGroup(VectorInput):
-    name: str = Field(min_length=1, max_length=7)
-    pages: list[Page] = Field(min_length=1, max_length=1000)
+    name: str = Field(min_length=1, max_length=MAX_GROUP_NAME_LENGTH)
+    pages: list[Page] = Field(min_length=1, max_length=MAX_PAGES_PER_SAVE)
     approvedAt: datetime
 
     @field_validator("name")
@@ -49,17 +57,17 @@ class ApprovedGroup(VectorInput):
 
 
 class SaveRequest(StrictModel):
-    groups: list[ApprovedGroup] = Field(min_length=1, max_length=100)
+    groups: list[ApprovedGroup] = Field(min_length=1, max_length=MAX_GROUPS_PER_SAVE)
 
     @model_validator(mode="after")
     def limit_total_pages(self):
-        if sum(len(group.pages) for group in self.groups) > 1000:
+        if sum(len(group.pages) for group in self.groups) > MAX_PAGES_PER_SAVE:
             raise ValueError("Too many pages.")
         return self
 
 
 class SearchRequest(VectorInput):
-    limit: int = Field(default=5, ge=1, le=5)
+    limit: int = Field(default=MAX_GROUPING_EXAMPLES, ge=1, le=MAX_GROUPING_EXAMPLES)
 
 
 class GroupingsStore:
@@ -114,7 +122,7 @@ class GroupingsStore:
                 "name": group.name,
                 "pages": pages,
                 "approvedAt": group.approvedAt.isoformat(),
-                "schemaVersion": 1,
+                "schemaVersion": SAVED_GROUPING_SCHEMA_VERSION,
                 "embeddingModel": EMBEDDING_MODEL,
                 "embeddingDimensions": DIMENSIONS,
             }
@@ -130,7 +138,7 @@ class GroupingsStore:
     def search(self, owner: str, request: SearchRequest):
         constraints = {
             "userId": owner,
-            "schemaVersion": 1,
+            "schemaVersion": SAVED_GROUPING_SCHEMA_VERSION,
             "embeddingModel": EMBEDDING_MODEL,
             "embeddingDimensions": DIMENSIONS,
         }
@@ -157,7 +165,10 @@ class GroupingsStore:
                 continue
 
             # Return only model context, never database fields or another owner's records.
-            pages = [Page.model_validate(page).model_dump() for page in payload["pages"][:5]]
+            pages = [
+                Page.model_validate(page).model_dump()
+                for page in payload["pages"][:MAX_PAGES_PER_EXAMPLE]
+            ]
             groups.append({"name": payload["name"], "pages": pages})
 
         return {"groups": groups}

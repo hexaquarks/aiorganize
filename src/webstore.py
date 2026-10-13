@@ -16,12 +16,16 @@ from .build import build_zip, chrome_version, git, tagged_files
 
 API_URL = "https://chromewebstore.googleapis.com"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
+CHROME_EXTENSION_ID_LENGTH = 32
+STORE_REQUEST_TIMEOUT_SECONDS = 30
+UPLOAD_WAIT_TIMEOUT_SECONDS = 120
+UPLOAD_POLL_INTERVAL_SECONDS = 2
 
 
 def _request_json(request: Request) -> dict:
     """Keep provider error bodies out of logs because they can contain credentials."""
     try:
-        with urlopen(request, timeout=30) as response:
+        with urlopen(request, timeout=STORE_REQUEST_TIMEOUT_SECONDS) as response:
             result = json.load(response)
     except HTTPError as error:
         raise ValueError(
@@ -52,8 +56,14 @@ class WebStoreClient:
         publisher = _required_environment("CWS_PUBLISHER_ID")
         item = _required_environment("CWS_EXTENSION_ID")
 
-        if not re.fullmatch(r"[a-zA-Z0-9_-]+", publisher) or not re.fullmatch(r"[a-p]{32}", item):
-            raise ValueError("Use the publisher ID and 32-character extension ID from the developer dashboard.")
+        valid_publisher = re.fullmatch(r"[a-zA-Z0-9_-]+", publisher)
+        valid_item = len(item) == CHROME_EXTENSION_ID_LENGTH and re.fullmatch(r"[a-p]+", item)
+
+        if not valid_publisher or not valid_item:
+            raise ValueError(
+                f"Use the publisher ID and {CHROME_EXTENSION_ID_LENGTH}-character extension ID "
+                "from the developer dashboard."
+            )
 
         self._name = f"publishers/{publisher}/items/{item}"
         credentials = {
@@ -97,7 +107,7 @@ class WebStoreClient:
     def status(self) -> dict:
         return self._request("fetchStatus")
 
-    def upload(self, package: bytes, *, wait_seconds: float = 120) -> None:
+    def upload(self, package: bytes, *, wait_seconds: float = UPLOAD_WAIT_TIMEOUT_SECONDS) -> None:
         response = self._request("upload", data=package, upload=True)
         state = response.get("uploadState")
         deadline = time.monotonic() + wait_seconds
@@ -107,7 +117,7 @@ class WebStoreClient:
             if time.monotonic() >= deadline:
                 raise ValueError("Upload is still processing. Run the status command before retrying.")
 
-            time.sleep(2)
+            time.sleep(UPLOAD_POLL_INTERVAL_SECONDS)
             state = self.status().get("lastAsyncUploadState")
 
         if state != "SUCCEEDED":
@@ -156,7 +166,7 @@ def release(client: WebStoreClient, tag: str, *, publish_private: bool, owner_on
 
     files = tagged_files(tag)
     ancestors = git("tag", "--merged", f"refs/tags/{tag}").decode().splitlines()
-    previous = [ancestor[1:] for ancestor in ancestors if ancestor.startswith("v") and ancestor != tag]
+    previous = [ancestor.removeprefix("v") for ancestor in ancestors if ancestor.startswith("v") and ancestor != tag]
 
     status = client.status()
 
