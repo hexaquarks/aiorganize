@@ -3,7 +3,7 @@ import json
 from playwright.async_api import expect
 
 from src.dev import CHROME_ARGS
-
+from tests.fixtures import proposal_input
 from tests.integration.test_panel import PanelTestCase
 
 
@@ -131,15 +131,17 @@ class ConnectionSetupTest(PanelTestCase):
         async def respond(route):
             request = route.request.post_data_json
             requests.append(request)
-            tabs = json.loads(request["input"])["tabs"]
+            tabs = proposal_input(request)["tabs"]
             await route.fulfill(
                 json={
                     "status": "completed",
                     "output": [
                         {
+                            "type": "message",
                             "content": [
                                 {
                                     "type": "output_text",
+                                    "annotations": [],
                                     "text": json.dumps(
                                         {
                                             "groups": [
@@ -170,7 +172,7 @@ class ConnectionSetupTest(PanelTestCase):
         self.assertEqual(request["model"], "gpt-6.1-sol")
         self.assertFalse(request["store"])
         self.assertEqual(request["text"]["format"]["name"], "tab_groups")
-        tabs = json.loads(request["input"])["tabs"]
+        tabs = proposal_input(request)["tabs"]
         self.assertEqual(len(tabs), 2)
         self.assertTrue(all(tab["url"].startswith("https://example.com/") for tab in tabs))
         stores = await self.panel.evaluate("""async () => ({
@@ -243,9 +245,11 @@ class ConnectionSetupTest(PanelTestCase):
                     "status": "completed",
                     "output": [
                         {
+                            "type": "message",
                             "content": [
                                 {
                                     "type": "output_text",
+                                    "annotations": [],
                                     "text": '{"groups":[{"name":"Test","tab_ids":["invented"]}]}',
                                 }
                             ]
@@ -315,6 +319,8 @@ class ConnectionSetupTest(PanelTestCase):
         await expect(self.panel.get_by_role("option", name="GPT-6.1 Sol", exact=True)).to_be_focused()
         trigger_box = await trigger.bounding_box()
         menu_box = await menu.bounding_box()
+        assert trigger_box is not None, "Expected the model selector to have a bounding box."
+        assert menu_box is not None, "Expected the model menu to have a bounding box."
         self.assertEqual(trigger_box["x"], menu_box["x"])
         self.assertEqual(trigger_box["width"], menu_box["width"])
 

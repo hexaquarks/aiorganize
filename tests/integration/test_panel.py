@@ -4,16 +4,14 @@ import tempfile
 import unittest
 
 from fastapi.testclient import TestClient
+from playwright.async_api import async_playwright, expect
 from qdrant_client import QdrantClient
 
 from src.api import create_app
-from src.groupings import GroupingsStore
-
-from playwright.async_api import async_playwright, expect
-
-from src.dev import CHROME_ARGS, load_extension
 from src.build import PROJECT
-from tests.fixtures import EXTENSION_PATH, TAB_STATE, create_test_tabs
+from src.dev import CHROME_ARGS, load_extension
+from src.groupings import GroupingsStore
+from tests.fixtures import EXTENSION_PATH, TAB_STATE, create_test_tabs, proposal_input
 
 
 class PanelTestCase(unittest.IsolatedAsyncioTestCase):
@@ -58,27 +56,35 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
             await route.fulfill(status=response.status_code, json=response.json())
 
         await self.panel.route("http://127.0.0.1:8765/**", backend_request)
-        await self.panel.route("https://api.openai.com/v1/embeddings", lambda route: route.fulfill(json={
-            "model": "text-embedding-3-small",
-            "data": [{"index": index, "embedding": [1.0] + [0.0] * 1535}
-                     for index in range(len(route.request.post_data_json["input"]))],
-        }))
+
+        async def embeddings(route):
+            body = route.request.post_data_json
+            assert body is not None, "Expected a JSON embedding request body."
+            await route.fulfill(json={
+                "model": "text-embedding-3-small",
+                "data": [{"index": index, "embedding": [1.0] + [0.0] * 1535}
+                         for index in range(len(body["input"]))],
+            })
+
+        await self.panel.route("https://api.openai.com/v1/embeddings", embeddings)
         await self.panel.goto(f"chrome-extension://{extension_id}/panel.html")
         await expect(self.panel.locator("#approve")).to_be_disabled(timeout=20000)
 
     async def connect(self, *, remember=False, api_key="test-secret"):
         async def respond(route):
             request = route.request.post_data_json
-            tabs = json.loads(request["input"])["tabs"]
+            tabs = proposal_input(request)["tabs"]
             proposal = {"groups": [{"name": "Test", "tab_ids": [tab["id"] for tab in tabs]}]}
             await route.fulfill(
                 json={
                     "status": "completed",
                     "output": [
                         {
+                            "type": "message",
                             "content": [
                                 {
                                     "type": "output_text",
+                                    "annotations": [],
                                     "text": json.dumps(proposal),
                                 }
                             ]
@@ -114,7 +120,7 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
         self.finish_proposal = asyncio.Event()
 
         async def respond(route):
-            snapshot = json.loads(route.request.post_data_json["input"])["tabs"]
+            snapshot = proposal_input(route.request.post_data_json)["tabs"]
             self.proposal_started.set()
             if delayed:
                 await self.finish_proposal.wait()
@@ -129,9 +135,11 @@ class PanelTestCase(unittest.IsolatedAsyncioTestCase):
                     "status": "completed",
                     "output": [
                         {
+                            "type": "message",
                             "content": [
                                 {
                                     "type": "output_text",
+                                    "annotations": [],
                                     "text": json.dumps({"groups": groups}),
                                 }
                             ]

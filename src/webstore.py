@@ -13,7 +13,6 @@ from urllib.request import Request, urlopen
 
 from .build import build_zip, chrome_version, git, tagged_files
 
-
 API_URL = "https://chromewebstore.googleapis.com"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 CHROME_EXTENSION_ID_LENGTH = 32
@@ -37,7 +36,8 @@ def _request_json(request: Request) -> dict:
         raise ValueError("Google API returned an invalid JSON response.") from None
 
     if not isinstance(result, dict):
-        raise ValueError("Google API returned an invalid response.")
+        # A malformed provider response is a validation failure, not a caller type error.
+        raise ValueError("Google API returned an invalid response.")  # noqa: TRY004
 
     return result
 
@@ -150,7 +150,10 @@ def store_versions(status: dict) -> list[str]:
             version = channel.get("crxVersion")
 
             if not isinstance(version, str):
-                raise ValueError("Store version is unavailable. Check the developer dashboard before uploading.")
+                # Preserve the command's validation-error contract for malformed store data.
+                raise ValueError(  # noqa: TRY004
+                    "Store version is unavailable. Check the developer dashboard before uploading."
+                )
 
             chrome_version(version)
             versions.append(version)

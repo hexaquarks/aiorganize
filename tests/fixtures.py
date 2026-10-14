@@ -1,8 +1,11 @@
+import json
 from html import escape
 
 from playwright.async_api import BrowserContext, Route
 
-from src.build import COMPILED_EXTENSION as EXTENSION_PATH
+from src.build import COMPILED_EXTENSION
+
+EXTENSION_PATH = COMPILED_EXTENSION
 
 TEST_TABS = {
     "https://tabs.test/python": "Python Tutorial",
@@ -44,3 +47,10 @@ TAB_STATE = """async () => {
         groups: groups.map(group => ({id: group.id, name: group.title, color: group.color, window_id: group.windowId})),
     };
 }"""
+
+
+def proposal_input(request: dict | None) -> dict:
+    """Read the tab context from LangChain's user message."""
+    assert request is not None, "Expected a JSON proposal request body."
+    message = next(message for message in request["input"] if message["role"] == "user")
+    return json.loads(message["content"])

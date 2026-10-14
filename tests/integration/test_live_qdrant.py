@@ -10,8 +10,8 @@ from qdrant_client import QdrantClient, models
 
 from src.api import create_app
 from src.groupings import COLLECTION, GroupingsStore
+from tests.fixtures import proposal_input
 from tests.integration.test_panel import PanelTestCase
-
 
 TEST_COLLECTION = f"{COLLECTION}_test"
 
@@ -43,7 +43,7 @@ class LiveQdrantTest(PanelTestCase):
         await self.panel.route("http://127.0.0.1:8765/**", through_api)
         await self.install_proposal_fixture()
         proposals = []
-        self.panel.on("request", lambda request: proposals.append(json.loads(request.post_data_json["input"]))
+        self.panel.on("request", lambda request: proposals.append(proposal_input(request.post_data_json))
                       if request.url.endswith("/v1/responses") else None)
         await self.organize()
         self.assertNotIn("saved_groupings", proposals[-1])
@@ -56,7 +56,14 @@ class LiveQdrantTest(PanelTestCase):
         )
         points, _ = database.scroll(TEST_COLLECTION, with_payload=True)
         self.assertEqual(len(points), 2)
-        self.assertEqual(len({point.payload["userId"] for point in points}), 1)
+        owners = set()
+
+        for point in points:
+            payload = point.payload
+            assert payload is not None, "Expected a saved grouping payload."
+            owners.add(payload["userId"])
+
+        self.assertEqual(len(owners), 1)
         self.assertIn("userId", database.get_collection(TEST_COLLECTION).payload_schema)
 
         await self.organize()
@@ -76,7 +83,14 @@ class LiveQdrantTest(PanelTestCase):
         )
         points, _ = database.scroll(TEST_COLLECTION, with_payload=True)
         self.assertEqual(len(points), 4)
-        self.assertEqual(len({point.payload["userId"] for point in points}), 2)
+        owners = set()
+
+        for point in points:
+            payload = point.payload
+            assert payload is not None, "Expected a saved grouping payload."
+            owners.add(payload["userId"])
+
+        self.assertEqual(len(owners), 2)
 
         await self.panel.evaluate(
             "identity => chrome.storage.local.set({savedGroupingsInstallation: identity})", first_identity,

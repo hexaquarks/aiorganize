@@ -7,9 +7,9 @@ from zipfile import ZipFile
 
 from playwright.async_api import expect
 
-from src.build import COMPILED_EXTENSION, EXTENSION_FILES, PROJECT, build_zip
+from src.build import COMPILED_EXTENSION, EXTENSION_FILES, build_zip
+from tests.fixtures import PRIVATE_PAGE_TEXT, TAB_STATE, proposal_input
 from tests.integration.test_panel import PanelTestCase
-from tests.fixtures import PRIVATE_PAGE_TEXT, TAB_STATE
 
 
 class BrowserApiTest(PanelTestCase):
@@ -30,7 +30,7 @@ class BrowserApiTest(PanelTestCase):
             request = route.request.post_data_json
             self.requests.append(request)
             self.assertEqual(route.request.headers["authorization"], "Bearer test-key")
-            context = json.loads(request["input"])
+            context = proposal_input(request)
             tabs = context["tabs"]
             proposal = {
                 "groups": [
@@ -50,9 +50,12 @@ class BrowserApiTest(PanelTestCase):
                     {
                         "status": "completed",
                         "output": [
-                            {"type": "message", "content": [{"type": "output_text", "text": json.dumps(proposal)}]}
+                            {
+                                "type": "message",
+                                "content": [{"type": "output_text", "text": json.dumps(proposal), "annotations": []}],
+                            }
                         ],
-                        "error": {"message": "sensitive-provider-detail"},
+                        "error": {"message": "sensitive-provider-detail"} if status != 200 else None,
                     }
                 ),
             )
@@ -88,7 +91,7 @@ class BrowserApiTest(PanelTestCase):
         self.assertFalse(request["store"])
         self.assertEqual(request["model"], "gpt-6.1-sol")
         self.assertEqual(request["text"]["format"]["type"], "json_schema")
-        context = json.loads(request["input"])
+        context = proposal_input(request)
         self.assertEqual(len(context["tabs"]), 6)
         self.assertEqual(set(context), {"tabs"})
         for tab in context["tabs"]:

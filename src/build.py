@@ -13,7 +13,6 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from packaging.version import Version
 
-
 PROJECT = Path(__file__).resolve().parents[1]
 # Chrome's manifest specification limits versions to four components, each at most 65535.
 # https://developer.chrome.com/docs/extensions/reference/manifest/version

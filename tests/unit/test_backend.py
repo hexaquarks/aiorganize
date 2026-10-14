@@ -8,7 +8,6 @@ from qdrant_client import QdrantClient
 from src.api import create_app
 from src.groupings import GroupingsStore
 
-
 SECRET = "test-signing-secret-that-is-at-least-thirty-two-bytes"
 
 
@@ -71,8 +70,9 @@ class BackendTest(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
 
     def test_legacy_unowned_records_are_not_claimed(self):
-        from qdrant_client.models import PointStruct
         from uuid import uuid4
+
+        from qdrant_client.models import PointStruct
 
         self.database.upsert("saved_groupings_test", [PointStruct(
             id=str(uuid4()), vector=group()["vector"], payload={"name": "Legacy", "pages": group()["pages"]},
@@ -112,7 +112,9 @@ class BackendTest(unittest.TestCase):
         self.assertNotIn("private-provider-secret", response.text)
 
     def test_startup_fails_when_database_cannot_connect(self):
-        with patch.object(self.store, "initialize", side_effect=RuntimeError("Database unavailable")):
-            with self.assertRaisesRegex(RuntimeError, "Database unavailable"):
-                with TestClient(create_app(self.store, SECRET)):
-                    self.fail("The API must not start without its database.")
+        with (
+            patch.object(self.store, "initialize", side_effect=RuntimeError("Database unavailable")),
+            self.assertRaisesRegex(RuntimeError, "Database unavailable"),
+            TestClient(create_app(self.store, SECRET)),
+        ):
+            self.fail("The API must not start without its database.")

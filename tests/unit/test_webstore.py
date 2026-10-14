@@ -1,14 +1,14 @@
 import io
 import json
 import unittest
+from email.message import Message
 from unittest.mock import Mock, patch
 from urllib.error import HTTPError
 from urllib.parse import parse_qs
 
 from src import webstore
-from src.build import COMPILED_EXTENSION, EXTENSION_FILES, PROJECT
+from src.build import COMPILED_EXTENSION, EXTENSION_FILES
 from src.webstore import WebStoreClient, release, store_versions
-
 
 PRIVATE_STATUS = {
     "publishedItemRevisionStatus": {
@@ -97,8 +97,9 @@ class WebStoreTest(unittest.TestCase):
             "CWS_CLIENT_SECRET": "test-secret",
             "CWS_REFRESH_TOKEN": "test-refresh",
         }
-        with patch.dict(webstore.os.environ, environment, clear=True):
-            with patch.object(
+        with (
+            patch.dict(webstore.os.environ, environment, clear=True),
+            patch.object(
                 webstore,
                 "_request_json",
                 side_effect=[
@@ -107,29 +108,30 @@ class WebStoreTest(unittest.TestCase):
                     {"uploadState": "SUCCEEDED"},
                     {"state": "PENDING_REVIEW"},
                 ],
-            ) as request:
-                with patch("sys.stdout", new=io.StringIO()) as output:
-                    client = WebStoreClient()
-                    client.status()
-                    client.upload(b"ZIP")
-                    client.publish_private()
-                token, status, upload, publish = [call.args[0] for call in request.call_args_list]
-                self.assertEqual(token.full_url, "https://oauth2.googleapis.com/token")
-                self.assertEqual(parse_qs(token.data.decode())["refresh_token"], ["test-refresh"])
-                self.assertTrue(status.full_url.endswith(f"/v2/publishers/publisher-123/items/{'a' * 32}:fetchStatus"))
-                self.assertEqual(status.get_method(), "GET")
-                self.assertIn("/upload/v2/", upload.full_url)
-                self.assertEqual(upload.data, b"ZIP")
-                self.assertEqual(upload.get_header("Authorization"), "Bearer test-token")
-                self.assertEqual(
-                    json.loads(publish.data),
-                    {
-                        "publishType": "DEFAULT_PUBLISH",
-                        "skipReview": False,
-                        "blockOnWarnings": True,
-                    },
-                )
-                self.assertEqual(output.getvalue(), "")
+            ) as request,
+            patch("sys.stdout", new=io.StringIO()) as output,
+        ):
+            client = WebStoreClient()
+            client.status()
+            client.upload(b"ZIP")
+            client.publish_private()
+            token, status, upload, publish = [call.args[0] for call in request.call_args_list]
+            self.assertEqual(token.full_url, "https://oauth2.googleapis.com/token")
+            self.assertEqual(parse_qs(token.data.decode())["refresh_token"], ["test-refresh"])
+            self.assertTrue(status.full_url.endswith(f"/v2/publishers/publisher-123/items/{'a' * 32}:fetchStatus"))
+            self.assertEqual(status.get_method(), "GET")
+            self.assertIn("/upload/v2/", upload.full_url)
+            self.assertEqual(upload.data, b"ZIP")
+            self.assertEqual(upload.get_header("Authorization"), "Bearer test-token")
+            self.assertEqual(
+                json.loads(publish.data),
+                {
+                    "publishType": "DEFAULT_PUBLISH",
+                    "skipReview": False,
+                    "blockOnWarnings": True,
+                },
+            )
+            self.assertEqual(output.getvalue(), "")
 
     def test_async_upload_is_polled_and_failure_or_timeout_is_not_success(self):
         client = object.__new__(WebStoreClient)
@@ -149,10 +151,9 @@ class WebStoreTest(unittest.TestCase):
     def test_missing_credentials_and_http_errors_do_not_expose_secrets(self):
         with patch.dict(webstore.os.environ, {}, clear=True), self.assertRaisesRegex(ValueError, "CWS_PUBLISHER_ID"):
             WebStoreClient()
-        error = HTTPError(webstore.TOKEN_URL, 400, "test-secret", {}, io.BytesIO(b"test-refresh"))
-        with patch.object(webstore, "urlopen", side_effect=error):
-            with self.assertRaises(ValueError) as raised:
-                webstore._request_json(webstore.Request(webstore.TOKEN_URL))
+        error = HTTPError(webstore.TOKEN_URL, 400, "test-secret", Message(), io.BytesIO(b"test-refresh"))
+        with patch.object(webstore, "urlopen", side_effect=error), self.assertRaises(ValueError) as raised:
+            webstore._request_json(webstore.Request(webstore.TOKEN_URL))
         self.assertNotIn("test-secret", str(raised.exception))
         self.assertNotIn("test-refresh", str(raised.exception))
 

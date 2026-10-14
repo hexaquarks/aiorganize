@@ -9,7 +9,13 @@ from unittest.mock import patch
 from zipfile import ZipFile
 
 from src import build
-from src.build import COMPILED_EXTENSION, EXTENSION_FILES, PROJECT, build_zip, chrome_version, tagged_files
+from src.build import (
+    COMPILED_EXTENSION,
+    EXTENSION_FILES,
+    build_zip,
+    chrome_version,
+    tagged_files,
+)
 
 
 class PackageExtensionTest(unittest.TestCase):
@@ -108,18 +114,19 @@ class PackageExtensionTest(unittest.TestCase):
                 run_git("add", "extension")
                 run_git("-c", "commit.gpgsign=false", "commit", "-m", "Update version")
                 run_git("tag", f"v{version}")
-                with patch.object(build, "PROJECT", root):
-                    with patch("sys.argv", ["build", "--tag", f"v{version}"]):
-                        if version == "0.0.9":
-                            with patch("sys.stderr", new=io.StringIO()), self.assertRaises(SystemExit) as error:
-                                build.main()
-                            self.assertEqual(error.exception.code, 2)
-                        else:
+                with (
+                    patch.object(build, "PROJECT", root),
+                    patch("sys.argv", ["build", "--tag", f"v{version}"]),
+                ):
+                    if version == "0.0.9":
+                        with patch("sys.stderr", new=io.StringIO()), self.assertRaises(SystemExit) as error:
                             build.main()
+                        self.assertEqual(error.exception.code, 2)
+                    else:
+                        build.main()
 
-            with patch.object(build, "PROJECT", root):
-                with patch("sys.argv", ["build", "--tag", "v0.1.0"]):
-                    build.main()
+            with patch.object(build, "PROJECT", root), patch("sys.argv", ["build", "--tag", "v0.1.0"]):
+                build.main()
             with ZipFile(archive) as package:
                 self.assertEqual({name: package.read(name) for name in package.namelist()}, self.files)
 
@@ -129,11 +136,14 @@ class PackageExtensionTest(unittest.TestCase):
             (root / "extension").mkdir()
             (root / "secret").write_text("do-not-package")
             (root / "extension/background.js").symlink_to(root / "secret")
-            with patch.object(build, "PROJECT", root):
-                with patch("sys.argv", ["build", "--preview"]):
-                    with patch("sys.stderr", new=io.StringIO()), self.assertRaises(SystemExit) as error:
-                        build.main()
-                    self.assertEqual(error.exception.code, 2)
+            with (
+                patch.object(build, "PROJECT", root),
+                patch("sys.argv", ["build", "--preview"]),
+                patch("sys.stderr", new=io.StringIO()),
+                self.assertRaises(SystemExit) as error,
+            ):
+                build.main()
+            self.assertEqual(error.exception.code, 2)
             self.assertFalse((root / "dist").exists())
 
 

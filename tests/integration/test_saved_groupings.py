@@ -2,7 +2,7 @@ import json
 
 from playwright.async_api import expect
 
-from tests.fixtures import TAB_STATE, PRIVATE_PAGE_TEXT
+from tests.fixtures import PRIVATE_PAGE_TEXT, TAB_STATE
 from tests.integration.test_panel import PanelTestCase
 
 
@@ -20,8 +20,17 @@ class SavedGroupingsTest(PanelTestCase):
         await self.panel.locator("#approve").click()
         await expect(self.panel.locator("#saved-groupings-status")).to_have_text("Approved groupings saved.")
         points, _ = self.database.scroll(self.store.collection, with_payload=True)
-        self.assertEqual({point.payload["name"] for point in points}, {"Dev", "Other"})
-        self.assertEqual(len({point.payload["userId"] for point in points}), 1)
+        names = set()
+        owners = set()
+
+        for point in points:
+            payload = point.payload
+            assert payload is not None, "Expected a saved grouping payload."
+            names.add(payload["name"])
+            owners.add(payload["userId"])
+
+        self.assertEqual(names, {"Dev", "Other"})
+        self.assertEqual(len(owners), 1)
         writes = [request for request in requests if request.url.endswith("/v1/groupings")]
         self.assertEqual(len(writes), 1)
         self.assertIn("authorization", writes[0].headers)

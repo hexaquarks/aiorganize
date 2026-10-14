@@ -3,7 +3,7 @@
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from http import HTTPStatus
 from typing import Annotated
 from uuid import UUID, uuid4
@@ -16,7 +16,6 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from qdrant_client import QdrantClient
 
 from .groupings import COLLECTION, GroupingsStore, SaveRequest, SearchRequest
-
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -57,7 +56,7 @@ def register(request: Request):
     # Keep the signing secret stable across deployments so installations retain access.
     claims = {
         "sub": str(uuid4()),
-        "iat": datetime.now(timezone.utc),
+        "iat": datetime.now(UTC),
         "iss": "aiorganize",
         "aud": "saved-groupings",
     }
@@ -74,7 +73,7 @@ def save(
 ):
     try:
         return store.save(user, body)
-    except Exception:
+    except Exception:  # noqa: BLE001 - Keep all database failure details out of client responses.
         logger.error("Saving groupings failed. Check the backend database connection.")
         raise HTTPException(HTTPStatus.SERVICE_UNAVAILABLE, "Saved groupings are temporarily unavailable.") from None
 
@@ -87,7 +86,7 @@ def search(
 ):
     try:
         return store.search(user, body)
-    except Exception:
+    except Exception:  # noqa: BLE001 - Keep all database failure details out of client responses.
         logger.error("Retrieving groupings failed. Check the backend database connection.")
         raise HTTPException(HTTPStatus.SERVICE_UNAVAILABLE, "Saved groupings are temporarily unavailable.") from None
 
@@ -97,7 +96,7 @@ def health():
     return {"status": "ok"}
 
 
-async def invalid_request(request: Request, error: RequestValidationError):
+async def invalid_request(request: Request, error: Exception) -> JSONResponse:
     return JSONResponse({"detail": "Invalid grouping request."}, status_code=HTTPStatus.UNPROCESSABLE_ENTITY)
 
 

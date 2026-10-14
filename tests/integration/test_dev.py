@@ -18,7 +18,10 @@ class DevelopmentStartupTest(unittest.TestCase):
                 self.subTest(location=location),
                 patch("src.dev.sys.platform", "win32"),
                 patch.dict(dev.os.environ, {location: str(root)}, clear=True),
-                patch("src.dev.Path.is_file", autospec=True, side_effect=lambda path: path == executable),
+                patch(
+                    "src.dev.Path.is_file", autospec=True,
+                    side_effect=lambda path, executable=executable: path == executable,
+                ),
                 patch("src.dev.shutil.which", return_value="explorer.exe"),
                 patch("src.dev.subprocess.Popen") as process,
             ):
@@ -72,9 +75,9 @@ class DevelopmentStartupTest(unittest.TestCase):
                 patch("src.dev.shutil.which", return_value=None),
                 patch("src.dev.Path.is_file", return_value=False),
                 patch("src.dev.subprocess.Popen") as process,
+                self.assertRaisesRegex(RuntimeError, "Chrome not found"),
             ):
-                with self.assertRaisesRegex(RuntimeError, "Chrome not found"):
-                    dev.open_regular_chrome()
+                dev.open_regular_chrome()
             process.assert_not_called()
 
     def test_missing_folder_opener_prints_path_after_launching_chrome(self):
@@ -120,5 +123,6 @@ class DevelopmentStartupTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
                 timeout=30,
+                check=False,
             )
         self.assertEqual(result.returncode, 0, result.stderr)

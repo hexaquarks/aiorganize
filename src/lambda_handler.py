@@ -8,7 +8,6 @@ from mangum import Mangum
 
 from .api import create_app, store_from_environment
 
-
 MAX_REQUEST_BYTES = 1024 * 1024
 
 

@@ -1,4 +1,7 @@
-import OpenAI from "openai";
+import { OpenAIEmbeddings } from "@langchain/openai";
+import { StatusCodes } from "http-status-codes";
+
+import { modelErrorName, modelErrorStatus } from "./model-errors";
 
 import { isRecord } from "./types";
 
@@ -27,27 +30,105 @@ export async function embedTexts(texts: string[], apiKey: string, signal?: Abort
 		);
 	}
 
-	const client = new OpenAI({
+	let requestSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+
+	if (signal) {
+		requestSignal = AbortSignal.any([signal, requestSignal]);
+	}
+
+	const embeddings = new OpenAIEmbeddings({
 		apiKey: key,
-		// The extension uses the owner's key in its trusted panel, never in a web page.
-		dangerouslyAllowBrowser: true,
+		model: EMBEDDING_MODEL,
+		dimensions: EMBEDDING_DIMENSIONS,
+		encodingFormat: "float",
+		// Preserve the exact embedding inputs used by the existing collection.
+		stripNewLines: false,
+		batchSize: MAX_EMBEDDING_INPUTS,
 		maxRetries: 0,
 		timeout: REQUEST_TIMEOUT_MS,
-		fetch: globalThis.fetch,
+		configuration: {
+			// LangChain embeddings do not accept a signal; cancel through the transport.
+			fetch: async (url, options) => {
+				const response = await globalThis.fetch(url, {
+					...options,
+					signal: requestSignal,
+					redirect: "error",
+					credentials: "omit",
+				});
+
+				if (!response.ok) {
+					return response;
+				}
+
+				const body = await response.json();
+				const vectors = readEmbeddings(body, texts.length);
+
+				// LangChain reads response order rather than indices; validate and order the batch first.
+				const data = vectors.map((embedding, index) => ({ index, embedding }));
+				return Response.json({ model: EMBEDDING_MODEL, data });
+			},
+		},
 	});
 
-	const body = await requestEmbeddings(client, texts, signal);
+	try {
+		requestSignal.throwIfAborted();
 
+		const vectors = await embeddings.embedDocuments(texts);
+
+		requestSignal.throwIfAborted();
+		return vectors;
+	} catch (error) {
+		const status = modelErrorStatus(error);
+		const cause = isRecord(error) ? error.cause : undefined;
+
+		if (requestSignal.reason?.name === "TimeoutError") {
+			throw new Error("OpenAI timed out. Try again.");
+		}
+
+		if (requestSignal.aborted) {
+			throw new DOMException("Saved groupings request cancelled.", "AbortError");
+		}
+
+		if (["TimeoutError", "APIConnectionTimeoutError"].includes(modelErrorName(error))) {
+			throw new Error("OpenAI timed out. Try again.");
+		}
+
+		// Provider errors can contain keys or page data. Show only messages we control.
+		if (status === StatusCodes.UNAUTHORIZED || status === StatusCodes.FORBIDDEN) {
+			throw new Error("OpenAI key rejected. Check access to embeddings.");
+		}
+
+		if (status === StatusCodes.TOO_MANY_REQUESTS) {
+			throw new Error("OpenAI is busy or quota is exhausted. Try again shortly.");
+		}
+
+		if (status !== undefined) {
+			throw new Error(`OpenAI request failed (${status}). Check the connection and try again.`);
+		}
+
+		if (error instanceof SyntaxError || cause instanceof SyntaxError) {
+			throw new Error("OpenAI returned an invalid response.");
+		}
+
+		if (cause instanceof TypeError) {
+			throw new Error("Could not connect to OpenAI. Check the connection and network.");
+		}
+
+		throw new Error("OpenAI returned invalid embeddings.");
+	}
+}
+
+function readEmbeddings(body: unknown, inputCount: number): number[][] {
 	if (
 		!isRecord(body) ||
 		body.model !== EMBEDDING_MODEL ||
 		!Array.isArray(body.data) ||
-		body.data.length !== texts.length
+		body.data.length !== inputCount
 	) {
 		throw new Error("OpenAI returned invalid embeddings.");
 	}
 
-	const vectors: number[][] = new Array(texts.length);
+	const vectors: number[][] = new Array(inputCount);
 	const seen = new Set<number>();
 
 	// Providers may return batched embeddings out of order; indices associate them with inputs.
@@ -57,7 +138,7 @@ export async function embedTexts(texts: string[], apiKey: string, signal?: Abort
 		}
 
 		const index = item.index;
-		const validIndex = typeof index === "number" && Number.isInteger(index) && index >= 0 && index < texts.length;
+		const validIndex = typeof index === "number" && Number.isInteger(index) && index >= 0 && index < inputCount;
 
 		if (!validIndex || seen.has(index) || !isEmbedding(item.embedding)) {
 			throw new Error("OpenAI returned invalid embeddings.");
@@ -68,61 +149,6 @@ export async function embedTexts(texts: string[], apiKey: string, signal?: Abort
 	}
 
 	return vectors;
-}
-
-async function requestEmbeddings(client: OpenAI, texts: string[], signal?: AbortSignal) {
-	let requestSignal = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-
-	if (signal) {
-		requestSignal = AbortSignal.any([signal, requestSignal]);
-	}
-
-	try {
-		requestSignal.throwIfAborted();
-
-		const response = await client.embeddings.create(
-			{
-				model: EMBEDDING_MODEL,
-				dimensions: EMBEDDING_DIMENSIONS,
-				encoding_format: "float",
-				input: texts,
-			},
-			{
-				signal: requestSignal,
-				fetchOptions: { redirect: "error", credentials: "omit" },
-			},
-		);
-
-		requestSignal.throwIfAborted();
-		return response;
-	} catch (error) {
-		if (requestSignal.reason?.name === "TimeoutError" || error instanceof OpenAI.APIConnectionTimeoutError) {
-			throw new Error("OpenAI timed out. Try again.");
-		}
-
-		if (requestSignal.aborted || error instanceof OpenAI.APIUserAbortError) {
-			throw new DOMException("Saved groupings request cancelled.", "AbortError");
-		}
-
-		// SDK errors can contain keys or page data. Show only messages we control.
-		if (error instanceof OpenAI.AuthenticationError || error instanceof OpenAI.PermissionDeniedError) {
-			throw new Error("OpenAI key rejected. Check access to embeddings.");
-		}
-
-		if (error instanceof OpenAI.RateLimitError) {
-			throw new Error("OpenAI is busy or quota is exhausted. Try again shortly.");
-		}
-
-		if (error instanceof OpenAI.APIError && error.status !== undefined) {
-			throw new Error(`OpenAI request failed (${error.status}). Check the connection and try again.`);
-		}
-
-		if (error instanceof TypeError || error instanceof OpenAI.APIConnectionError) {
-			throw new Error("Could not connect to OpenAI. Check the connection and network.");
-		}
-
-		throw new Error("OpenAI returned an invalid response.");
-	}
 }
 
 function isEmbedding(value: unknown): value is number[] {

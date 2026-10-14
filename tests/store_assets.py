@@ -9,8 +9,7 @@ from pathlib import Path
 from playwright.async_api import async_playwright, expect
 
 from src.dev import CHROME_ARGS, load_extension
-from tests.fixtures import EXTENSION_PATH, create_test_tabs
-
+from tests.fixtures import EXTENSION_PATH, create_test_tabs, proposal_input
 
 STORE = Path(__file__).resolve().parents[1] / "store"
 
@@ -59,7 +58,7 @@ async def main() -> None:
                 )
 
                 async def respond(route):
-                    tabs = json.loads(route.request.post_data_json["input"])["tabs"]
+                    tabs = proposal_input(route.request.post_data_json)["tabs"]
                     categories = {
                         "Python Tutorial": "Dev",
                         "LangChain Docs": "Dev",
@@ -77,9 +76,11 @@ async def main() -> None:
                             "status": "completed",
                             "output": [
                                 {
+                                    "type": "message",
                                     "content": [
                                         {
                                             "type": "output_text",
+                                            "annotations": [],
                                             "text": json.dumps(proposal),
                                         }
                                     ]
