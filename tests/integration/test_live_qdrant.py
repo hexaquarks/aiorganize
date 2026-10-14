@@ -10,6 +10,7 @@ from qdrant_client import QdrantClient, models
 
 from src.api import create_app
 from src.groupings import COLLECTION, GroupingsStore
+from tests.fixtures import proposal_input
 from tests.integration.test_panel import PanelTestCase
 
 
@@ -43,7 +44,7 @@ class LiveQdrantTest(PanelTestCase):
         await self.panel.route("http://127.0.0.1:8765/**", through_api)
         await self.install_proposal_fixture()
         proposals = []
-        self.panel.on("request", lambda request: proposals.append(json.loads(request.post_data_json["input"]))
+        self.panel.on("request", lambda request: proposals.append(proposal_input(request.post_data_json))
                       if request.url.endswith("/v1/responses") else None)
         await self.organize()
         self.assertNotIn("saved_groupings", proposals[-1])

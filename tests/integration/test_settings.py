@@ -3,7 +3,7 @@ import json
 from playwright.async_api import expect
 
 from src.dev import CHROME_ARGS
-
+from tests.fixtures import proposal_input
 from tests.integration.test_panel import PanelTestCase
 
 
@@ -131,15 +131,17 @@ class ConnectionSetupTest(PanelTestCase):
         async def respond(route):
             request = route.request.post_data_json
             requests.append(request)
-            tabs = json.loads(request["input"])["tabs"]
+            tabs = proposal_input(request)["tabs"]
             await route.fulfill(
                 json={
                     "status": "completed",
                     "output": [
                         {
+                            "type": "message",
                             "content": [
                                 {
                                     "type": "output_text",
+                                    "annotations": [],
                                     "text": json.dumps(
                                         {
                                             "groups": [
@@ -170,7 +172,7 @@ class ConnectionSetupTest(PanelTestCase):
         self.assertEqual(request["model"], "gpt-6.1-sol")
         self.assertFalse(request["store"])
         self.assertEqual(request["text"]["format"]["name"], "tab_groups")
-        tabs = json.loads(request["input"])["tabs"]
+        tabs = proposal_input(request)["tabs"]
         self.assertEqual(len(tabs), 2)
         self.assertTrue(all(tab["url"].startswith("https://example.com/") for tab in tabs))
         stores = await self.panel.evaluate("""async () => ({
@@ -243,9 +245,11 @@ class ConnectionSetupTest(PanelTestCase):
                     "status": "completed",
                     "output": [
                         {
+                            "type": "message",
                             "content": [
                                 {
                                     "type": "output_text",
+                                    "annotations": [],
                                     "text": '{"groups":[{"name":"Test","tab_ids":["invented"]}]}',
                                 }
                             ]

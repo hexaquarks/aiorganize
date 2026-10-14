@@ -3,6 +3,7 @@ import json
 
 from playwright.async_api import expect
 
+from tests.fixtures import proposal_input
 from tests.integration.test_panel import PanelTestCase
 
 
@@ -79,15 +80,17 @@ class ModelDiscoveryTest(PanelTestCase):
         async def validate(route):
             request = route.request.post_data_json
             validation_requests.append(request)
-            tabs = json.loads(request["input"])["tabs"]
+            tabs = proposal_input(request)["tabs"]
             await route.fulfill(
                 json={
                     "status": "completed",
                     "output": [
                         {
+                            "type": "message",
                             "content": [
                                 {
                                     "type": "output_text",
+                                    "annotations": [],
                                     "text": json.dumps(
                                         {
                                             "groups": [
@@ -107,7 +110,7 @@ class ModelDiscoveryTest(PanelTestCase):
 
         await expect(self.panel.locator("#ready")).to_be_visible()
         self.assertEqual(validation_requests[0]["model"], "gpt-5-mini")
-        self.assertEqual(len(json.loads(validation_requests[0]["input"])["tabs"]), 2)
+        self.assertEqual(len(proposal_input(validation_requests[0])["tabs"]), 2)
         settings = await self.read_settings()
         self.assertEqual(settings["model"], "gpt-5-mini")
         await expect(self.panel.locator("#organize")).to_be_enabled()

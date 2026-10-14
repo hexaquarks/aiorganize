@@ -51,10 +51,6 @@ test("invalid embedding batches are rejected instead of returning usable vectors
 		[{ index: 0, embedding: vector().fill(0) }],
 		[{ index: 0, embedding: Array(1536).fill(null) }],
 		[{ index: 2, embedding: vector() }],
-		[
-			{ index: 0, embedding: vector() },
-			{ index: 0, embedding: vector() },
-		],
 	]) {
 		globalThis.fetch = async () => Response.json({ model: EMBEDDING_MODEL, data });
 
@@ -102,4 +98,51 @@ test("timeouts, cancellation, and network failures remain distinguishable", asyn
 
 	AbortSignal.timeout = () => AbortSignal.abort(new DOMException("provider-secret", "TimeoutError"));
 	await assert.rejects(embedTexts(["Python"], "key"), /OpenAI timed out/);
+});
+
+test("LangChain preserves embedding text and aborts an in-flight request", async () => {
+	const text = "Python\nTutorial";
+	globalThis.fetch = async (_url, options = {}) => {
+		assert.deepEqual(JSON.parse(String(options.body)).input, [text]);
+		return Response.json({ model: EMBEDDING_MODEL, data: [{ index: 0, embedding: vector() }] });
+	};
+
+	await embedTexts([text], "key");
+
+	const controller = new AbortController();
+	globalThis.fetch = async (_url, options = {}) => {
+		controller.abort();
+		options.signal?.throwIfAborted();
+		throw new Error("Unexpected request completion");
+	};
+
+	await assert.rejects(embedTexts([text], "key", controller.signal), { name: "AbortError" });
+});
+
+test("embedding indices must be unique and cover a complete batch", async () => {
+	for (const indices of [
+		[0, 0],
+		[1, 1],
+		[0, 2],
+		[-1, 1],
+		[0, 0.5],
+	]) {
+		globalThis.fetch = async () =>
+			Response.json({
+				model: EMBEDDING_MODEL,
+				data: indices.map((index) => ({ index, embedding: vector() })),
+			});
+
+		await assert.rejects(embedTexts(["Python", "Recipes"], "key"), /invalid embeddings/i);
+	}
+});
+
+test("cancelled embeddings are discarded even if the transport returns a response", async () => {
+	const controller = new AbortController();
+	globalThis.fetch = async () => {
+		controller.abort();
+		return Response.json({ model: EMBEDDING_MODEL, data: [{ index: 0, embedding: vector() }] });
+	};
+
+	await assert.rejects(embedTexts(["Python"], "key", controller.signal), { name: "AbortError" });
 });

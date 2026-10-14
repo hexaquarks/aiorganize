@@ -1,8 +1,6 @@
-import json
-
 from playwright.async_api import expect
 
-from tests.fixtures import TAB_STATE
+from tests.fixtures import TAB_STATE, proposal_input
 from tests.integration.test_panel import PanelTestCase
 
 
@@ -10,7 +8,7 @@ class RetrievalTest(PanelTestCase):
     async def test_saved_groups_reach_the_llm_and_survive_panel_reload(self):
         await self.install_proposal_fixture()
         proposals = []
-        self.panel.on("request", lambda request: proposals.append(json.loads(request.post_data_json["input"]))
+        self.panel.on("request", lambda request: proposals.append(proposal_input(request.post_data_json))
                       if request.url.endswith("/v1/responses") else None)
         await self.organize()
         self.assertNotIn("saved_groupings", proposals[-1])

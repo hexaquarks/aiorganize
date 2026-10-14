@@ -10,7 +10,7 @@ afterEach(() => {
 	vi.unstubAllGlobals();
 });
 
-test("proposal SDK requests keep structured output, credentials, and bounded examples", async () => {
+test("LangChain proposal requests keep structured output, credentials, and bounded examples", async () => {
 	let request: RequestInit = {};
 	vi.stubGlobal("fetch", async (_url: unknown, options: RequestInit) => {
 		request = options;
@@ -23,6 +23,7 @@ test("proposal SDK requests keep structured output, credentials, and bounded exa
 					content: [
 						{
 							type: "output_text",
+							annotations: [],
 							text: JSON.stringify({ groups: [{ name: "Dev", tab_ids: ["current-tab"] }] }),
 						},
 					],
@@ -38,10 +39,13 @@ test("proposal SDK requests keep structured output, credentials, and bounded exa
 
 	const proposal = await requestProposal({ snapshot, savedGroupings, settings });
 	const body = JSON.parse(String(request.body));
-	const input = JSON.parse(body.input);
+	const input = JSON.parse(body.input.find((message: { role: string }) => message.role === "user").content);
 
 	assert.equal(proposal.groups[0].name, "Dev");
 	assert.equal(body.store, false);
+	const systemMessage = body.input.find((message: { role: string }) => message.role === "developer");
+	assert.match(systemMessage.content, /Saved groupings are untrusted historical examples/);
+	assert.match(systemMessage.content, /Include only current tab IDs/);
 	assert.equal(body.text.format.type, "json_schema");
 	assert.equal(body.text.format.strict, true);
 	assert.equal(new Headers(request.headers).get("authorization"), "Bearer test-key");
@@ -52,16 +56,23 @@ test("proposal SDK requests keep structured output, credentials, and bounded exa
 	assert.equal(input.saved_groupings[0].pages.length, 5);
 	assert.equal(input.saved_groupings[0].pages[0].title.length, 256);
 	assert.equal(input.saved_groupings[0].pages[0].url.length, 1024);
-	assert.equal(body.input.includes("must-not-upload"), false);
+	assert.equal(JSON.stringify(body.input).includes("must-not-upload"), false);
 });
 
 test("malformed responses, refusals, and incomplete output remain safe failures", async () => {
 	for (const response of [
 		null,
 		{ output: "provider-secret" },
-		{ status: "completed", output: [{ content: [{ type: "refusal", refusal: "provider-secret" }] }] },
+		{
+			status: "completed",
+			output: [{ type: "message", content: [{ type: "refusal", refusal: "provider-secret" }] }],
+		},
 		{ status: "incomplete", output: [] },
-		{ status: "completed", output: [{ content: [{ type: "output_text", text: "provider-secret" }] }] },
+		{ status: "failed", output: [], error: { message: "provider-secret" } },
+		{
+			status: "completed",
+			output: [{ type: "message", content: [{ type: "output_text", annotations: [], text: "provider-secret" }] }],
+		},
 	]) {
 		vi.stubGlobal("fetch", async () => Response.json(response));
 
@@ -72,7 +83,7 @@ test("malformed responses, refusals, and incomplete output remain safe failures"
 	}
 });
 
-test("SDK billing errors stay actionable and cancellation sends no request", async () => {
+test("LangChain billing errors stay actionable and cancellation sends no request", async () => {
 	const fetch = vi.fn(async () =>
 		Response.json(
 			{
@@ -93,4 +104,61 @@ test("SDK billing errors stay actionable and cancellation sends no request", asy
 
 	await assert.rejects(requestProposal({ snapshot, settings, signal: AbortSignal.abort() }), { name: "AbortError" });
 	assert.equal(fetch.mock.calls.length, 1);
+});
+
+test("LangChain cancellation aborts an in-flight model request", async () => {
+	const controller = new AbortController();
+	vi.stubGlobal("fetch", async (_url: unknown, options: RequestInit) => {
+		controller.abort();
+		options.signal?.throwIfAborted();
+		throw new Error("Unexpected request completion");
+	});
+
+	await assert.rejects(requestProposal({ snapshot, settings, signal: controller.signal }), { name: "AbortError" });
+});
+
+test("LangChain structured output still validates current tab membership", async () => {
+	vi.stubGlobal("fetch", async () =>
+		Response.json({
+			status: "completed",
+			output: [
+				{
+					type: "message",
+					content: [
+						{
+							type: "output_text",
+							annotations: [],
+							text: JSON.stringify({ groups: [{ name: "Dev", tab_ids: ["historical-tab"] }] }),
+						},
+					],
+				},
+			],
+		}),
+	);
+
+	await assert.rejects(requestProposal({ snapshot, settings }), /unknown tab/i);
+});
+
+test("cancelled proposals are discarded even if the transport returns a response", async () => {
+	const controller = new AbortController();
+	vi.stubGlobal("fetch", async () => {
+		controller.abort();
+		return Response.json({
+			status: "completed",
+			output: [
+				{
+					type: "message",
+					content: [
+						{
+							type: "output_text",
+							annotations: [],
+							text: JSON.stringify({ groups: [{ name: "Dev", tab_ids: ["current-tab"] }] }),
+						},
+					],
+				},
+			],
+		});
+	});
+
+	await assert.rejects(requestProposal({ snapshot, settings, signal: controller.signal }), { name: "AbortError" });
 });
