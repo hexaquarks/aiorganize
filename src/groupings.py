@@ -5,9 +5,15 @@ from datetime import datetime
 from typing import Annotated
 from uuid import NAMESPACE_URL, uuid5
 
-from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    FiniteFloat,
+    field_validator,
+    model_validator,
+)
 from qdrant_client import QdrantClient, models
-
 
 COLLECTION = "aiorganize_groups_v1_text_embedding_3_small_1536"
 EMBEDDING_MODEL = "text-embedding-3-small"
@@ -142,7 +148,7 @@ class GroupingsStore:
             "embeddingModel": EMBEDDING_MODEL,
             "embeddingDimensions": DIMENSIONS,
         }
-        conditions = [
+        conditions: list[models.Condition] = [
             models.FieldCondition(key=key, match=models.MatchValue(value=value))
             for key, value in constraints.items()
         ]

@@ -7,9 +7,9 @@ from zipfile import ZipFile
 
 from playwright.async_api import expect
 
-from src.build import COMPILED_EXTENSION, EXTENSION_FILES, PROJECT, build_zip
-from tests.integration.test_panel import PanelTestCase
+from src.build import COMPILED_EXTENSION, EXTENSION_FILES, build_zip
 from tests.fixtures import PRIVATE_PAGE_TEXT, TAB_STATE, proposal_input
+from tests.integration.test_panel import PanelTestCase
 
 
 class BrowserApiTest(PanelTestCase):

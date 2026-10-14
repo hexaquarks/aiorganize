@@ -11,7 +11,6 @@ from playwright.async_api import async_playwright, expect
 from src.dev import CHROME_ARGS, load_extension
 from tests.fixtures import EXTENSION_PATH, create_test_tabs, proposal_input
 
-
 STORE = Path(__file__).resolve().parents[1] / "store"
 
 

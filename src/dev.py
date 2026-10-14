@@ -12,7 +12,6 @@ from playwright.async_api import BrowserContext, Error, async_playwright
 
 from .build import PROJECT, build_frontend
 
-
 EXTENSION_PATH = PROJECT / "extension"
 CHROME_ARGS = ["--enable-unsafe-extension-debugging"]
 DEFAULT_PROFILE = Path.home() / ".aiorganize" / "chrome"

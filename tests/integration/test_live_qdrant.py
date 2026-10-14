@@ -13,7 +13,6 @@ from src.groupings import COLLECTION, GroupingsStore
 from tests.fixtures import proposal_input
 from tests.integration.test_panel import PanelTestCase
 
-
 TEST_COLLECTION = f"{COLLECTION}_test"
 
 
@@ -57,7 +56,14 @@ class LiveQdrantTest(PanelTestCase):
         )
         points, _ = database.scroll(TEST_COLLECTION, with_payload=True)
         self.assertEqual(len(points), 2)
-        self.assertEqual(len({point.payload["userId"] for point in points}), 1)
+        owners = set()
+
+        for point in points:
+            payload = point.payload
+            assert payload is not None, "Expected a saved grouping payload."
+            owners.add(payload["userId"])
+
+        self.assertEqual(len(owners), 1)
         self.assertIn("userId", database.get_collection(TEST_COLLECTION).payload_schema)
 
         await self.organize()
@@ -77,7 +83,14 @@ class LiveQdrantTest(PanelTestCase):
         )
         points, _ = database.scroll(TEST_COLLECTION, with_payload=True)
         self.assertEqual(len(points), 4)
-        self.assertEqual(len({point.payload["userId"] for point in points}), 2)
+        owners = set()
+
+        for point in points:
+            payload = point.payload
+            assert payload is not None, "Expected a saved grouping payload."
+            owners.add(payload["userId"])
+
+        self.assertEqual(len(owners), 2)
 
         await self.panel.evaluate(
             "identity => chrome.storage.local.set({savedGroupingsInstallation: identity})", first_identity,

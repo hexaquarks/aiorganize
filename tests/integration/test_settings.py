@@ -319,6 +319,8 @@ class ConnectionSetupTest(PanelTestCase):
         await expect(self.panel.get_by_role("option", name="GPT-6.1 Sol", exact=True)).to_be_focused()
         trigger_box = await trigger.bounding_box()
         menu_box = await menu.bounding_box()
+        assert trigger_box is not None, "Expected the model selector to have a bounding box."
+        assert menu_box is not None, "Expected the model menu to have a bounding box."
         self.assertEqual(trigger_box["x"], menu_box["x"])
         self.assertEqual(trigger_box["width"], menu_box["width"])
 
